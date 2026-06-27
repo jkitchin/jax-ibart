@@ -27,7 +27,9 @@ def test_unary_numeric_and_symbolic():
     out = engineer.apply_unary(pool, [UNARY["sq"]])
     # square of every primary feature, provenance preserved
     assert out.n_descriptors == 3
-    assert {sp.srepr(e) for e in out.exprs} == {sp.srepr(sp.Symbol(s) ** 2) for s in "abc"}
+    assert {sp.srepr(e) for e in out.exprs} == {
+        sp.srepr(sp.Symbol(s) ** 2) for s in "abc"
+    }
     np.testing.assert_allclose(np.asarray(out.X), X**2, rtol=1e-5)  # float32
 
 

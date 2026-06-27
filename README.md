@@ -1,5 +1,7 @@
 # jax-ibart
 
+[![CI](https://github.com/jkitchin/jax-ibart/actions/workflows/ci.yml/badge.svg)](https://github.com/jkitchin/jax-ibart/actions/workflows/ci.yml)
+
 A JAX-native reimplementation of **iBART** (iterative Bayesian Additive
 Regression Trees) for symbolic descriptor discovery in materials informatics.
 Pure Python, GPU-capable, `pip`-installable (no JVM).

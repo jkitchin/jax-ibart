@@ -22,8 +22,15 @@ def test_ibart_recovers_product_descriptor():
     names = ["a", "b", "c", "d"]
 
     model = IBart(
-        backend="bart", schedule=("b",), max_dim=1, n_keep=8, seed=0,
-        n_perm=12, n_tree=40, n_draw=300, n_burn=300,
+        backend="bart",
+        schedule=("b",),
+        max_dim=1,
+        n_keep=8,
+        seed=0,
+        n_perm=12,
+        n_tree=40,
+        n_draw=300,
+        n_burn=300,
     ).fit(X, y, feature_names=names)
 
     # The single best descriptor should be the product a*b.

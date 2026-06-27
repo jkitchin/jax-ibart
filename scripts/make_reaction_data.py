@@ -41,8 +41,9 @@ def main(noise=0.02, seed=0):
 
     rows = []
     for b, (a0, b0) in enumerate(ICs):
-        sol = solve_ivp(rhs, [t[0], t[-1]], [a0, b0, 0.0, 0.0], t_eval=t,
-                        rtol=1e-10, atol=1e-10)
+        sol = solve_ivp(
+            rhs, [t[0], t[-1]], [a0, b0, 0.0, 0.0], t_eval=t, rtol=1e-10, atol=1e-10
+        )
         C = sol.y.T + rng.normal(0.0, noise, sol.y.T.shape)  # measurement noise
         for ti, ci in zip(t, C):
             rows.append([b, float(ti), *map(float, ci)])

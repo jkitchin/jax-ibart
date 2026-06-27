@@ -23,9 +23,9 @@ import jax.numpy as jnp
 import optax
 
 # Hard-concrete hyperparameters (Louizos et al. defaults).
-_BETA = 0.5       # temperature
-_GAMMA = -0.1     # stretch lower bound
-_ZETA = 1.1       # stretch upper bound
+_BETA = 0.5  # temperature
+_GAMMA = -0.1  # stretch lower bound
+_ZETA = 1.1  # stretch upper bound
 
 
 def _open_prob(log_alpha):

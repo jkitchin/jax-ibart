@@ -18,7 +18,7 @@ import time
 
 from jax_ibart import IBart, engineer
 from jax_ibart.datasets import load_metal_support
-from jax_ibart.operators import default_binary, default_unary
+from jax_ibart.operators import default_binary
 
 
 def _time(fn):
@@ -35,16 +35,29 @@ def main(do_bart: bool):
     # Later rounds run on a *selected* (small) pool, so this is the FE worst case.
     pool = engineer.from_primary(X, names, units=units)
     b1, t = _time(lambda: engineer.apply_binary(pool, default_binary()))
-    print(f"FE  apply_binary (59 features -> pairs) : {t:6.2f}s  -> {b1.n_descriptors} descriptors")
+    print(
+        f"FE  apply_binary (59 features -> pairs) : {t:6.2f}s  -> {b1.n_descriptors} descriptors"
+    )
 
-    _, t = _time(lambda: IBart(backend="diff", schedule=("b", "u", "b"),
-                               seed=0, steps=1000).fit(X, y, names, units=units))
+    _, t = _time(
+        lambda: IBart(backend="diff", schedule=("b", "u", "b"), seed=0, steps=1000).fit(
+            X, y, names, units=units
+        )
+    )
     print(f"\nend-to-end  diff backend   : {t:6.1f}s")
 
     if do_bart:
-        _, t = _time(lambda: IBart(backend="bart", schedule=("b", "u", "b"),
-                                   seed=0, n_perm=10, n_tree=30, n_draw=200,
-                                   n_burn=200).fit(X, y, names, units=units))
+        _, t = _time(
+            lambda: IBart(
+                backend="bart",
+                schedule=("b", "u", "b"),
+                seed=0,
+                n_perm=10,
+                n_tree=30,
+                n_draw=200,
+                n_burn=200,
+            ).fit(X, y, names, units=units)
+        )
         print(f"end-to-end  bart backend   : {t:6.1f}s  (BART-G.SE dominates)")
 
 

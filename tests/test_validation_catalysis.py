@@ -13,7 +13,6 @@ metal/oxide binding energy with R^2 ~ 0.92, via a descriptor coupling the oxide
 formation enthalpy and the oxygen vacancy energy.
 """
 
-import numpy as np
 import pytest
 
 pytest.importorskip("bartz")
@@ -27,9 +26,16 @@ def test_reproduces_catalysis_descriptor():
     X, y, names, units = load_metal_support()
 
     model = IBart(
-        backend="bart", schedule=("b", "u", "b"),  # paper's opt strategy
-        max_dim=3, n_keep=10, score="bic", seed=0,
-        n_perm=10, n_tree=30, n_draw=200, n_burn=200,
+        backend="bart",
+        schedule=("b", "u", "b"),  # paper's opt strategy
+        max_dim=3,
+        n_keep=10,
+        score="bic",
+        seed=0,
+        n_perm=10,
+        n_tree=30,
+        n_draw=200,
+        n_burn=200,
     ).fit(X, y, feature_names=names, units=units)  # dimensional-analysis filter on
 
     # Predictive performance of the right order (the published OIS model reaches
@@ -58,13 +64,24 @@ def test_permissive_screen_recovers_hfo_oxv_coupling():
     """
     X, y, names, units = load_metal_support()
     model = IBart(
-        backend="bart", schedule=("b", "u", "b"), max_dim=3, n_keep=15,
-        score="bic", seed=0, alpha=0.25,  # permissive threshold
-        n_perm=25, n_tree=40, n_draw=400, n_burn=400,
+        backend="bart",
+        schedule=("b", "u", "b"),
+        max_dim=3,
+        n_keep=15,
+        score="bic",
+        seed=0,
+        alpha=0.25,  # permissive threshold
+        n_perm=25,
+        n_tree=40,
+        n_draw=400,
+        n_burn=400,
     ).fit(X, y, feature_names=names, units=units)
 
     # At least one selected descriptor couples Hfo and Oxv (the dH_ox,fm/O_vac
     # mechanism); the conservative default does not achieve this.
-    coupled = [e for e in model.descriptors_
-               if {"Hfo", "Oxv"} <= {str(s) for s in e.free_symbols}]
+    coupled = [
+        e
+        for e in model.descriptors_
+        if {"Hfo", "Oxv"} <= {str(s) for s in e.free_symbols}
+    ]
     assert coupled, f"no Hfo/Oxv-coupled descriptor in {model.descriptors_}"

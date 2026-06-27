@@ -34,25 +34,32 @@ EPS = 1e-12
 # transcendental and root unary operators yield unitless results.
 # --------------------------------------------------------------------------- #
 
-def u_keep(u):           # abs, neg, id
+
+def u_keep(u):  # abs, neg, id
     return u
 
-def u_zero(u):           # sqrt, log, exp, sin, cos -> unitless
+
+def u_zero(u):  # sqrt, log, exp, sin, cos -> unitless
     return np.zeros_like(u)
 
-def u_double(u):         # square
+
+def u_double(u):  # square
     return 2 * u
 
-def u_neg(u):            # inverse
+
+def u_neg(u):  # inverse
     return -u
 
-def u_same(a, b):        # add, sub, absdiff: require matching units
+
+def u_same(a, b):  # add, sub, absdiff: require matching units
     return a if np.array_equal(a, b) else None
 
-def u_add(a, b):         # multiply
+
+def u_add(a, b):  # multiply
     return a + b
 
-def u_sub(a, b):         # divide
+
+def u_sub(a, b):  # divide
     return a - b
 
 
@@ -72,36 +79,83 @@ class Operator:
 # --------------------------------------------------------------------------- #
 
 UNARY: dict[str, Operator] = {
-    "id": Operator("id", 1, lambda x: x, lambda e: e,
-                   lambda x: jnp.ones(x.shape[-1], bool), unit=u_keep),
-    "neg": Operator("neg", 1, lambda x: -x, lambda e: -e,
-                    lambda x: jnp.ones(x.shape[-1], bool), unit=u_keep),
-    "sq": Operator("sq", 1, lambda x: x * x, lambda e: e**2,
-                   lambda x: jnp.ones(x.shape[-1], bool), unit=u_double),
-    "abs": Operator("abs", 1, jnp.abs, sp.Abs,
-                    lambda x: jnp.ones(x.shape[-1], bool), unit=u_keep),
+    "id": Operator(
+        "id",
+        1,
+        lambda x: x,
+        lambda e: e,
+        lambda x: jnp.ones(x.shape[-1], bool),
+        unit=u_keep,
+    ),
+    "neg": Operator(
+        "neg",
+        1,
+        lambda x: -x,
+        lambda e: -e,
+        lambda x: jnp.ones(x.shape[-1], bool),
+        unit=u_keep,
+    ),
+    "sq": Operator(
+        "sq",
+        1,
+        lambda x: x * x,
+        lambda e: e**2,
+        lambda x: jnp.ones(x.shape[-1], bool),
+        unit=u_double,
+    ),
+    "abs": Operator(
+        "abs", 1, jnp.abs, sp.Abs, lambda x: jnp.ones(x.shape[-1], bool), unit=u_keep
+    ),
     # Domain-restricted: only columns satisfying the predicate are emitted.
     "sqrt": Operator(
-        "sqrt", 1, lambda x: jnp.sqrt(jnp.abs(x)), lambda e: sp.sqrt(e),
-        lambda x: jnp.all(x >= 0, axis=0), unit=u_zero,
+        "sqrt",
+        1,
+        lambda x: jnp.sqrt(jnp.abs(x)),
+        lambda e: sp.sqrt(e),
+        lambda x: jnp.all(x >= 0, axis=0),
+        unit=u_zero,
     ),
     "log": Operator(
-        "log", 1, lambda x: jnp.log(jnp.abs(x) + EPS), lambda e: sp.log(e),
-        lambda x: jnp.all(x > 0, axis=0), unit=u_zero,
+        "log",
+        1,
+        lambda x: jnp.log(jnp.abs(x) + EPS),
+        lambda e: sp.log(e),
+        lambda x: jnp.all(x > 0, axis=0),
+        unit=u_zero,
     ),
     "exp": Operator(
-        "exp", 1, jnp.exp, sp.exp,
+        "exp",
+        1,
+        jnp.exp,
+        sp.exp,
         # guard against overflow: only well-scaled columns
-        lambda x: jnp.all(jnp.abs(x) < 50, axis=0), unit=u_zero,
+        lambda x: jnp.all(jnp.abs(x) < 50, axis=0),
+        unit=u_zero,
     ),
     "inv": Operator(
-        "inv", 1, lambda x: 1.0 / jnp.where(jnp.abs(x) < EPS, jnp.nan, x), lambda e: 1 / e,
-        lambda x: jnp.all(jnp.abs(x) > EPS, axis=0), unit=u_neg,
+        "inv",
+        1,
+        lambda x: 1.0 / jnp.where(jnp.abs(x) < EPS, jnp.nan, x),
+        lambda e: 1 / e,
+        lambda x: jnp.all(jnp.abs(x) > EPS, axis=0),
+        unit=u_neg,
     ),
-    "sin": Operator("sin", 1, lambda x: jnp.sin(jnp.pi * x), lambda e: sp.sin(sp.pi * e),
-                    lambda x: jnp.ones(x.shape[-1], bool), unit=u_zero),
-    "cos": Operator("cos", 1, lambda x: jnp.cos(jnp.pi * x), lambda e: sp.cos(sp.pi * e),
-                    lambda x: jnp.ones(x.shape[-1], bool), unit=u_zero),
+    "sin": Operator(
+        "sin",
+        1,
+        lambda x: jnp.sin(jnp.pi * x),
+        lambda e: sp.sin(sp.pi * e),
+        lambda x: jnp.ones(x.shape[-1], bool),
+        unit=u_zero,
+    ),
+    "cos": Operator(
+        "cos",
+        1,
+        lambda x: jnp.cos(jnp.pi * x),
+        lambda e: sp.cos(sp.pi * e),
+        lambda x: jnp.ones(x.shape[-1], bool),
+        unit=u_zero,
+    ),
 }
 
 
@@ -109,29 +163,54 @@ UNARY: dict[str, Operator] = {
 # Binary operators (O2)
 # --------------------------------------------------------------------------- #
 
+
 def _safe_div(a, b):
     return a / jnp.where(jnp.abs(b) < EPS, jnp.nan, b)
 
 
 BINARY: dict[str, Operator] = {
-    "add": Operator("add", 2, lambda a, b: a + b, lambda e, f: e + f,
-                    lambda a, b: True, unit=u_same, commutative=True),
-    "sub": Operator("sub", 2, lambda a, b: a - b, lambda e, f: e - f,
-                    lambda a, b: True, unit=u_same),
-    "mul": Operator("mul", 2, lambda a, b: a * b, lambda e, f: e * f,
-                    lambda a, b: True, unit=u_add, commutative=True),
-    "div": Operator("div", 2, _safe_div, lambda e, f: e / f,
-                    lambda a, b: True, unit=u_sub),
+    "add": Operator(
+        "add",
+        2,
+        lambda a, b: a + b,
+        lambda e, f: e + f,
+        lambda a, b: True,
+        unit=u_same,
+        commutative=True,
+    ),
+    "sub": Operator(
+        "sub", 2, lambda a, b: a - b, lambda e, f: e - f, lambda a, b: True, unit=u_same
+    ),
+    "mul": Operator(
+        "mul",
+        2,
+        lambda a, b: a * b,
+        lambda e, f: e * f,
+        lambda a, b: True,
+        unit=u_add,
+        commutative=True,
+    ),
+    "div": Operator(
+        "div", 2, _safe_div, lambda e, f: e / f, lambda a, b: True, unit=u_sub
+    ),
     # |a - b|: a single, directly interpretable operator (Ye et al. 2024).
-    "absdiff": Operator("absdiff", 2, lambda a, b: jnp.abs(a - b),
-                        lambda e, f: sp.Abs(e - f), lambda a, b: True,
-                        unit=u_same, commutative=True),
+    "absdiff": Operator(
+        "absdiff",
+        2,
+        lambda a, b: jnp.abs(a - b),
+        lambda e, f: sp.Abs(e - f),
+        lambda a, b: True,
+        unit=u_same,
+        commutative=True,
+    ),
 }
 
 
 def default_unary() -> list[Operator]:
     """The O1 set used in the catalysis study (Liu et al. 2022)."""
-    return [UNARY[k] for k in ("id", "neg", "sq", "sqrt", "log", "exp", "abs", "sin", "cos")]
+    return [
+        UNARY[k] for k in ("id", "neg", "sq", "sqrt", "log", "exp", "abs", "sin", "cos")
+    ]
 
 
 def default_binary() -> list[Operator]:

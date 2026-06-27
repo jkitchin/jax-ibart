@@ -49,9 +49,17 @@ class IBart:
         OLS coefficients ``[intercept, *slopes]`` aligned with ``descriptors_``.
     """
 
-    def __init__(self, backend: str = "bart", schedule=DEFAULT_SCHEDULE,
-                 max_dim: int = 3, n_keep: int = 10, score: str = "bic",
-                 screen_primaries: bool = False, seed: int = 0, **selector_kwargs):
+    def __init__(
+        self,
+        backend: str = "bart",
+        schedule=DEFAULT_SCHEDULE,
+        max_dim: int = 3,
+        n_keep: int = 10,
+        score: str = "bic",
+        screen_primaries: bool = False,
+        seed: int = 0,
+        **selector_kwargs,
+    ):
         self.backend = backend
         self.schedule = schedule
         self.max_dim = max_dim
@@ -76,9 +84,13 @@ class IBart:
     def get_params(self) -> dict:
         """Constructor kwargs, for cloning a fresh unfitted estimator."""
         return dict(
-            backend=self.backend, schedule=self.schedule, max_dim=self.max_dim,
-            n_keep=self.n_keep, score=self.score,
-            screen_primaries=self.screen_primaries, seed=self.seed,
+            backend=self.backend,
+            schedule=self.schedule,
+            max_dim=self.max_dim,
+            n_keep=self.n_keep,
+            score=self.score,
+            screen_primaries=self.screen_primaries,
+            seed=self.seed,
             **self._selector_kwargs,
         )
 
@@ -105,8 +117,11 @@ class IBart:
             pool = self._screen(pool, y, sk)
 
         for step in self.schedule:
-            pool = (engineer.apply_unary(pool, unary) if step == "u"
-                    else engineer.apply_binary(pool, binary))
+            pool = (
+                engineer.apply_unary(pool, unary)
+                if step == "u"
+                else engineer.apply_binary(pool, binary)
+            )
             if pool.n_descriptors == 0:
                 break
             key, sk = jax.random.split(key)
@@ -116,7 +131,8 @@ class IBart:
         Xpool = np.asarray(pool.X, dtype=np.float64)
         cand = sparsify.lasso_screen(Xpool, y, n_keep=self.n_keep)
         local, coef = sparsify.l0_best_subset(
-            Xpool[:, cand], y, max_dim=self.max_dim, score=self.score)
+            Xpool[:, cand], y, max_dim=self.max_dim, score=self.score
+        )
         self.descriptors_ = [pool.exprs[cand[i]] for i in local]
         self.coef_ = coef
         return self
@@ -142,8 +158,9 @@ class IBart:
         cols = []
         for expr in self.descriptors_:
             f = sp.lambdify(syms, expr, modules="numpy")
-            cols.append(np.asarray(f(*[X[:, i] for i in range(X.shape[1])]),
-                                   dtype=np.float64))
+            cols.append(
+                np.asarray(f(*[X[:, i] for i in range(X.shape[1])]), dtype=np.float64)
+            )
         return np.column_stack(cols)
 
     def predict(self, X):
@@ -152,9 +169,27 @@ class IBart:
         D = self._design(X)
         return self.coef_[0] + D @ self.coef_[1:]
 
-    def expression(self) -> sp.Expr:
-        """The fitted model as a single symbolic expression."""
+    def expression(self, digits: int = 4) -> sp.Expr:
+        """The fitted model as a single symbolic expression.
+
+        Coefficients are rounded to ``digits`` significant figures for display
+        (pass ``digits=None`` for full precision).
+        """
         expr = sp.Float(self.coef_[0])
         for c, d in zip(self.coef_[1:], self.descriptors_):
             expr = expr + sp.Float(c) * d
-        return expr
+        return sp.N(expr, digits) if digits else expr
+
+    def latex(self, lhs: str = "y", digits: int = 4) -> str:
+        """The fitted model as a LaTeX string, e.g. ``y = -0.099 BVS Hfo + ...``."""
+        return f"{lhs} = {sp.latex(self.expression(digits))}"
+
+    def to_html(self, lhs: str = "y", digits: int = 4) -> str:
+        """An HTML snippet rendering the model (MathJax/KaTeX delimiters)."""
+        return f"<p>\\({self.latex(lhs, digits)}\\)</p>"
+
+    def _repr_latex_(self) -> str:
+        """Rich LaTeX display in Jupyter/notebooks."""
+        if self.coef_ is None:
+            return "IBart(unfitted)"
+        return f"${self.latex()}$"

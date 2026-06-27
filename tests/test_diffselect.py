@@ -16,7 +16,7 @@ import sympy as sp
 pytest.importorskip("optax")
 
 from jax_ibart import IBart
-from jax_ibart._diffscreen import _open_prob, _sample_gate, screen_importance
+from jax_ibart._diffscreen import _open_prob, _sample_gate
 from jax_ibart.selection import DiffSelector, make_selector
 
 
@@ -31,8 +31,8 @@ def test_diff_keeps_signal_rejects_noise():
     X, y = _friedman()
     keep = np.asarray(DiffSelector(steps=1500).select(X, y, key=jax.random.PRNGKey(0)))
     assert keep.shape == (X.shape[1],)
-    assert keep[0] and keep[1]          # PAN: both true drivers kept
-    assert keep[2:].sum() <= 1          # noise rejected
+    assert keep[0] and keep[1]  # PAN: both true drivers kept
+    assert keep[2:].sum() <= 1  # noise rejected
 
 
 def test_factory_returns_diff_backend():
@@ -47,8 +47,11 @@ def test_diff_agrees_with_bart_oracle():
 
     X, y = _friedman()
     diff = np.asarray(DiffSelector(steps=1500).select(X, y, key=jax.random.PRNGKey(0)))
-    bart = np.asarray(BartGSESelector(n_perm=15, n_tree=40, n_draw=300, n_burn=300)
-                      .select(X, y, key=jax.random.PRNGKey(0)))
+    bart = np.asarray(
+        BartGSESelector(n_perm=15, n_tree=40, n_draw=300, n_burn=300).select(
+            X, y, key=jax.random.PRNGKey(0)
+        )
+    )
     # Both keep the true drivers; neither commits a false negative there.
     assert diff[0] and diff[1] and bart[0] and bart[1]
 
@@ -79,8 +82,9 @@ def test_ibart_diff_backend_end_to_end():
     X = np.column_stack([a, b, c, d])
     y = 5.0 * (a * b) + rng.normal(0, 0.05, n)
 
-    model = IBart(backend="diff", schedule=("b",), max_dim=1, seed=0,
-                  steps=1200).fit(X, y, feature_names=["a", "b", "c", "d"])
+    model = IBart(backend="diff", schedule=("b",), max_dim=1, seed=0, steps=1200).fit(
+        X, y, feature_names=["a", "b", "c", "d"]
+    )
 
     target = sp.Symbol("a") * sp.Symbol("b")
     assert any(sp.simplify(e - target) == 0 for e in model.descriptors_)

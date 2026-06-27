@@ -10,6 +10,12 @@ from .ibart import IBart
 from .selection import BartGSESelector, DiffSelector, make_selector
 from . import uncertainty, dynamics
 
-__all__ = ["IBart", "BartGSESelector", "DiffSelector", "make_selector",
-           "uncertainty", "dynamics"]
+__all__ = [
+    "IBart",
+    "BartGSESelector",
+    "DiffSelector",
+    "make_selector",
+    "uncertainty",
+    "dynamics",
+]
 __version__ = "0.0.1"

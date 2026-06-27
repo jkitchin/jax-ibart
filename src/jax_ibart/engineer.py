@@ -69,10 +69,10 @@ def apply_unary(pool: Pool, ops: list[Operator], corr_max_d: int = 10000) -> Poo
         idx = np.where(np.asarray(op.valid(pool.X)))[0]
         if idx.size == 0:
             continue
-        blocks.append(op.fn(pool.X[:, idx]))               # (n, k) batched
+        blocks.append(op.fn(pool.X[:, idx]))  # (n, k) batched
         exprs.extend(op.sym(pool.exprs[j]) for j in idx)
         if has_units:
-            units.append(op.unit(pool.units[idx]))         # vectorized unit rule
+            units.append(op.unit(pool.units[idx]))  # vectorized unit rule
     return _concat(blocks, exprs, units, corr_max_d)
 
 
@@ -100,15 +100,15 @@ def apply_binary(pool: Pool, ops: list[Operator], corr_max_d: int = 10000) -> Po
 
         new_u = None
         if has_units:
-            if op.unit is u_same:                          # additive: keep if equal
+            if op.unit is u_same:  # additive: keep if equal
                 ok = np.all(U[I] == U[J], axis=1)
                 I, J = I[ok], J[ok]
                 new_u = U[I]
-            elif op.unit is u_add:                         # multiply: add exponents
+            elif op.unit is u_add:  # multiply: add exponents
                 new_u = U[I] + U[J]
-            elif op.unit is u_sub:                         # divide: subtract
+            elif op.unit is u_sub:  # divide: subtract
                 new_u = U[I] - U[J]
-            else:                                          # generic fallback
+            else:  # generic fallback
                 pairs = [(op.unit(U[a], U[b]), a, b) for a, b in zip(I, J)]
                 keep = [(u, a, b) for (u, a, b) in pairs if u is not None]
                 if not keep:
@@ -119,7 +119,7 @@ def apply_binary(pool: Pool, ops: list[Operator], corr_max_d: int = 10000) -> Po
             if I.size == 0:
                 continue
 
-        blocks.append(op.fn(pool.X[:, I], pool.X[:, J]))   # (n, npairs) batched
+        blocks.append(op.fn(pool.X[:, I], pool.X[:, J]))  # (n, npairs) batched
         exprs.extend(op.sym(pool.exprs[a], pool.exprs[b]) for a, b in zip(I, J))
         if has_units:
             units.append(new_u)
@@ -128,8 +128,11 @@ def apply_binary(pool: Pool, ops: list[Operator], corr_max_d: int = 10000) -> Po
 
 def _concat(blocks, exprs, units, corr_max_d: int = 10000) -> Pool:
     if not blocks:
-        return Pool(X=jnp.zeros((0, 0)), exprs=[],
-                    units=None if units is None else np.zeros((0, 0), dtype=np.int64))
+        return Pool(
+            X=jnp.zeros((0, 0)),
+            exprs=[],
+            units=None if units is None else np.zeros((0, 0), dtype=np.int64),
+        )
     X = jnp.concatenate(blocks, axis=1)
     u = None if units is None else np.concatenate(units, axis=0).astype(np.int64)
     return clean(Pool(X=X, exprs=exprs, units=u), corr_max_d=corr_max_d)

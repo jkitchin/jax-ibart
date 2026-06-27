@@ -37,6 +37,7 @@ from .operators import BINARY, UNARY
 # Derivative estimation
 # --------------------------------------------------------------------------- #
 
+
 def finite_difference(X_t, t):
     """Central finite-difference time derivatives of a trajectory.
 
@@ -58,8 +59,10 @@ def finite_difference(X_t, t):
 # Library construction (reuses the iBART engineer + unit filter)
 # --------------------------------------------------------------------------- #
 
-def polynomial_library(X, feature_names, degree: int = 2, units=None,
-                       dedup_collinear: bool = True):
+
+def polynomial_library(
+    X, feature_names, degree: int = 2, units=None, dedup_collinear: bool = True
+):
     """A degree-<=2 polynomial library: linear, squares, pairwise products.
 
     Built with the iBART feature engine, so the dimensional-analysis filter
@@ -74,8 +77,10 @@ def polynomial_library(X, feature_names, degree: int = 2, units=None,
     lin = engineer.from_primary(X, feature_names, units=units)
     blocks = [lin]
     if degree >= 2:
-        blocks.append(engineer.apply_unary(lin, [UNARY["sq"]], corr_max_d=cmd))   # x^2
-        blocks.append(engineer.apply_binary(lin, [BINARY["mul"]], corr_max_d=cmd))  # x*y
+        blocks.append(engineer.apply_unary(lin, [UNARY["sq"]], corr_max_d=cmd))  # x^2
+        blocks.append(
+            engineer.apply_binary(lin, [BINARY["mul"]], corr_max_d=cmd)
+        )  # x*y
     Xcat = jnp.concatenate([b.X for b in blocks if b.n_descriptors], axis=1)
     exprs = [e for b in blocks for e in b.exprs]
     u = None
@@ -90,23 +95,52 @@ class DiscoveredSystem:
     """A discovered ODE system: one symbolic RHS per state variable."""
 
     state_names: list
-    rhs: list            # list[sympy.Expr], dx_i/dt = rhs[i]
-    r2: list             # per-equation in-sample R^2
+    rhs: list  # list[sympy.Expr], dx_i/dt = rhs[i]
+    r2: list  # per-equation in-sample R^2
 
     def __str__(self):
         def fmt(e):
             return sp.nsimplify(e, rational=False).evalf(4)
-        return "\n".join(f"d{n}/dt = {fmt(e)}  (R^2={r:.3f})"
-                         for n, e, r in zip(self.state_names, self.rhs, self.r2))
+
+        return "\n".join(
+            f"d{n}/dt = {fmt(e)}  (R^2={r:.3f})"
+            for n, e, r in zip(self.state_names, self.rhs, self.r2)
+        )
+
+    def latex(self, digits: int = 4) -> str:
+        """The discovered system as an aligned LaTeX environment."""
+        rows = [
+            rf"\frac{{d{n}}}{{dt}} &= {sp.latex(sp.N(e, digits))}"
+            for n, e in zip(self.state_names, self.rhs)
+        ]
+        return r"\begin{aligned}" + r" \\ ".join(rows) + r"\end{aligned}"
+
+    def to_html(self, digits: int = 4) -> str:
+        """An HTML snippet rendering the system (MathJax/KaTeX delimiters)."""
+        return f"<p>\\[{self.latex(digits)}\\]</p>"
+
+    def _repr_latex_(self) -> str:
+        """Rich LaTeX display in Jupyter/notebooks."""
+        return f"$${self.latex()}$$"
 
 
 # --------------------------------------------------------------------------- #
 # Explicit ODE discovery (SINDy)
 # --------------------------------------------------------------------------- #
 
-def discover_ode(X_t, t, feature_names, degree: int = 2, max_terms: int = 3,
-                 units=None, dXdt=None, coef_threshold: float = 1e-3,
-                 screen: str | None = None, seed: int = 0):
+
+def discover_ode(
+    X_t,
+    t,
+    feature_names,
+    degree: int = 2,
+    max_terms: int = 3,
+    units=None,
+    dXdt=None,
+    coef_threshold: float = 1e-3,
+    screen: str | None = None,
+    seed: int = 0,
+):
     """Discover dx_i/dt = f_i(x) by sparse regression on a polynomial library.
 
     Parameters
@@ -137,8 +171,8 @@ def discover_ode(X_t, t, feature_names, degree: int = 2, max_terms: int = 3,
     bart = None
     if screen == "bart":
         from .selection import BartGSESelector
-        bart = BartGSESelector(n_perm=30, alpha=0.20, n_tree=40,
-                               n_draw=400, n_burn=400)
+
+        bart = BartGSESelector(n_perm=30, alpha=0.20, n_tree=40, n_draw=400, n_burn=400)
 
     rhs, r2 = [], []
     for i in range(len(feature_names)):
@@ -149,18 +183,27 @@ def discover_ode(X_t, t, feature_names, degree: int = 2, max_terms: int = 3,
             cand = np.where(keep)[0] if keep.any() else np.arange(L.shape[1])
         else:
             cand = sparsify.lasso_screen(
-                L, yi, n_keep=min(2 * max_terms + 2, L.shape[1]))
-        idx, coef = sparsify.l0_best_subset(L[:, cand], yi, max_dim=max_terms,
-                                            score="bic")
+                L, yi, n_keep=min(2 * max_terms + 2, L.shape[1])
+            )
+        idx, coef = sparsify.l0_best_subset(
+            L[:, cand], yi, max_dim=max_terms, score="bic"
+        )
         # STLSQ-style cleanup: drop terms whose coefficient is negligible
         # relative to the largest, then refit OLS on the survivors.
         slopes = coef[1:]
         big = np.abs(slopes) > coef_threshold * (np.abs(slopes).max() + 1e-30)
         idx = [j for j, keep in zip(idx, big) if keep]
         cols = [L[:, cand[j]] for j in idx]
-        A = np.column_stack([np.ones(len(yi))] + cols) if cols else np.ones((len(yi), 1))
-        coef, _ = sparsify._ols(np.column_stack(cols), yi) if cols else (
-            np.array([yi.mean()]), 0.0)
+        A = (
+            np.column_stack([np.ones(len(yi))] + cols)
+            if cols
+            else np.ones((len(yi), 1))
+        )
+        coef, _ = (
+            sparsify._ols(np.column_stack(cols), yi)
+            if cols
+            else (np.array([yi.mean()]), 0.0)
+        )
 
         expr = sp.Float(coef[0])
         for c, j in zip(coef[1:], idx):
@@ -176,8 +219,10 @@ def discover_ode(X_t, t, feature_names, degree: int = 2, max_terms: int = 3,
 # DAE foundation: implicit / null-space constraint discovery (PROTOTYPE)
 # --------------------------------------------------------------------------- #
 
-def implicit_constraints(X, feature_names, degree: int = 2, units=None,
-                         tol: float = 1e-2):
+
+def implicit_constraints(
+    X, feature_names, degree: int = 2, units=None, tol: float = 1e-2
+):
     """PROTOTYPE: find algebraic constraints g(x) ~ 0 (the DAE algebraic part).
 
     A differential-algebraic system couples dynamics dx/dt = f with algebraic
@@ -208,8 +253,9 @@ def implicit_constraints(X, feature_names, degree: int = 2, units=None,
     vector over the library terms, and the residual (smaller = closer to an
     exact constraint).
     """
-    lib = polynomial_library(X, feature_names, degree=degree, units=units,
-                             dedup_collinear=False)
+    lib = polynomial_library(
+        X, feature_names, degree=degree, units=units, dedup_collinear=False
+    )
     Theta = np.asarray(lib.X, dtype=np.float64)
     exprs = list(lib.exprs)
     # augment with a constant column so constraints like x^2 + y^2 - 1 = 0 are
@@ -231,7 +277,11 @@ def implicit_constraints(X, feature_names, degree: int = 2, units=None,
     for c, e in zip(xi, exprs):
         if abs(c) > tol:
             expr = expr + sp.Float(round(c, 4)) * e
-    return {"constraint": expr, "coef": xi, "terms": [str(e) for e in exprs],
-            "residual": residual,
-            "note": "PROTOTYPE: dense SVD null space; production needs sparse "
-                    "null-space selection + weak form (see docstring)."}
+    return {
+        "constraint": expr,
+        "coef": xi,
+        "terms": [str(e) for e in exprs],
+        "residual": residual,
+        "note": "PROTOTYPE: dense SVD null space; production needs sparse "
+        "null-space selection + weak form (see docstring).",
+    }

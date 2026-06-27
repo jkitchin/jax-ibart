@@ -42,7 +42,8 @@ def test_conformal_coverage_is_honest():
     idx = rng.permutation(len(y))
     te, tr = idx[:80], idx[80:]
     conf = uncertainty.conformal_intervals(
-        _factory, X[tr], y[tr], names, alpha=0.10, cal_frac=0.4, seed=0)
+        _factory, X[tr], y[tr], names, alpha=0.10, cal_frac=0.4, seed=0
+    )
     cov = uncertainty.empirical_coverage(conf, X[te], y[te])
     # marginal guarantee is ~0.90; allow finite-sample slack
     assert cov >= 0.80, f"coverage {cov:.2f} far below nominal 0.90"
@@ -69,6 +70,9 @@ def test_bart_posterior_intervals():
     X, y, names = _data()
     model = _factory().fit(X, y, names)
     out = uncertainty.bart_posterior_intervals(
-        model, X, y, X[:10], alpha=0.10, n_tree=30, n_draw=200, n_burn=200)
-    assert np.all(out["lower"] <= out["median"]) and np.all(out["median"] <= out["upper"])
+        model, X, y, X[:10], alpha=0.10, n_tree=30, n_draw=200, n_burn=200
+    )
+    assert np.all(out["lower"] <= out["median"]) and np.all(
+        out["median"] <= out["upper"]
+    )
     assert out["lower"].shape == (10,)

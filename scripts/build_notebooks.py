@@ -15,8 +15,13 @@ OUT.mkdir(parents=True, exist_ok=True)
 def nb(*cells):
     n = nbf.v4.new_notebook()
     n.cells = list(cells)
-    n.metadata = {"kernelspec": {"name": "python3", "display_name": "Python 3",
-                                 "language": "python"}}
+    n.metadata = {
+        "kernelspec": {
+            "name": "python3",
+            "display_name": "Python 3",
+            "language": "python",
+        }
+    }
     return n
 
 
@@ -95,6 +100,19 @@ plt.show()
 It recovers `a*b` and fits `~5*a*b`, the hidden relationship. The descriptor is
 *symbolic*, so you can read the physics straight off the model, and the parity
 plot lands on the diagonal.
+"""),
+    md("""
+### Richer representations
+
+The fitted model renders as **LaTeX** automatically in notebooks, and you can
+export LaTeX or HTML strings for papers and web pages.
+"""),
+    code("""
+model   # rich LaTeX rendering (via _repr_latex_)
+"""),
+    code("""
+print("latex:", model.latex())
+print("html :", model.to_html())
 """),
 )
 
@@ -318,7 +336,9 @@ sol = solve_ivp(lorenz, [t[0], t[-1]], [-8, 8, 27], t_eval=t, rtol=1e-9, atol=1e
 X = sol.y.T   # (n_time, 3) trajectory
 X.shape
 """),
-    md("Derivatives are estimated from the trajectory (finite differences), then each equation is recovered by sparse regression:"),
+    md(
+        "Derivatives are estimated from the trajectory (finite differences), then each equation is recovered by sparse regression:"
+    ),
     code("""
 system = dynamics.discover_ode(X, t, ["x", "y", "z"], degree=2, max_terms=3)
 print(system)
@@ -532,6 +552,7 @@ This notebook shows the wins, the one real limitation, and two workarounds.
     md("## 1. Nonlinear expressions it recovers exactly"),
     code("""
 import numpy as np
+import matplotlib.pyplot as plt
 from jax_ibart import IBart
 
 rng = np.random.default_rng(0)
@@ -539,19 +560,32 @@ n = 200
 x1, x2, x3 = (rng.uniform(0.1, 1, n) for _ in range(3))
 X = np.column_stack([x1, x2, x3]); names = ["x1", "x2", "x3"]
 
-def r2(model, y):
-    p = model.predict(X)
-    return 1 - ((y - p) ** 2).sum() / ((y - y.mean()) ** 2).sum()
+def fit_and_score(y, schedule):
+    m = IBart(backend="diff", schedule=schedule, max_dim=1, seed=0, steps=1500).fit(X, y, names)
+    pred = m.predict(X)
+    r2 = 1 - ((y - pred) ** 2).sum() / ((y - y.mean()) ** 2).sum()
+    return m, pred, r2
 
-# transcendental: y = sin(pi * x1 * x2)
-y = np.sin(np.pi * x1 * x2)
-m = IBart(backend="diff", schedule=("b", "u"), max_dim=1, seed=0, steps=1500).fit(X, y, names)
-print(f"sin(pi*x1*x2)         -> {m.descriptors_}  R2={r2(m, y):.4f}")
-
-# the OIS paper's example: y = (exp(x1) - exp(x2))^2
-y = (np.exp(x1) - np.exp(x2)) ** 2
-m = IBart(backend="diff", schedule=("u", "b", "u"), max_dim=1, seed=0, steps=1500).fit(X, y, names)
-print(f"(exp(x1)-exp(x2))^2   -> {m.descriptors_}  R2={r2(m, y):.4f}")
+cases = [
+    ("sin(pi*x1*x2)", np.sin(np.pi * x1 * x2), ("b", "u")),
+    ("(exp(x1)-exp(x2))^2", (np.exp(x1) - np.exp(x2)) ** 2, ("u", "b", "u")),
+]
+results = []
+for label, y, sched in cases:
+    m, pred, r2 = fit_and_score(y, sched)
+    results.append((label, y, pred, m, r2))
+    print(f"{label:>22}  ->  {m.descriptors_}   R2={r2:.4f}")
+"""),
+    md("Parity plots: the recovered nonlinear models land on the diagonal."),
+    code("""
+fig, axes = plt.subplots(1, 2, figsize=(9, 4))
+for ax, (label, y, pred, m, r2) in zip(axes, results):
+    ax.scatter(y, pred, s=14, alpha=0.6)
+    lo, hi = float(y.min()), float(y.max())
+    ax.plot([lo, hi], [lo, hi], "k--", lw=1)
+    ax.set_title(f"y = {label}\\nR$^2$={r2:.4f}")
+    ax.set_xlabel("true y"); ax.set_ylabel("predicted"); ax.set_aspect("equal")
+fig.tight_layout(); plt.show()
 """),
     md("""
 Both are recovered with R^2 = 1.0. Transcendental, rational, product, and
@@ -574,6 +608,22 @@ pr = m.predict(Xp)
 print("x^2.3  -> found", m.descriptors_,
       f" R2={1 - ((y-pr)**2).sum()/((y-y.mean())**2).sum():.4f}  (approximate, not exact)")
 """),
+    md(
+        "Plotting the fit against `x` shows the approximation drifting from the true curve:"
+    ),
+    code("""
+order = np.argsort(xp)
+fig, axes = plt.subplots(1, 2, figsize=(9, 3.6))
+axes[0].plot(xp[order], y[order], lw=2, label="true  x$^{2.3}$")
+axes[0].plot(xp[order], pr[order], "--", lw=2, label=f"iBART  {m.descriptors_[0]}")
+axes[0].set_xlabel("x"); axes[0].set_ylabel("y"); axes[0].legend()
+axes[0].set_title("best the operator library can do")
+axes[1].plot(xp[order], (pr - y)[order], color="C3")
+axes[1].axhline(0, color="k", lw=0.8)
+axes[1].set_xlabel("x"); axes[1].set_ylabel("residual (fit - true)")
+axes[1].set_title("structured residual = missing exponent")
+fig.tight_layout(); plt.show()
+"""),
     md("""
 Same story for **Arrhenius** `k = A exp(-E/RT)` with a fitted activation energy
 `E` *inside* the exponential, or **Michaelis-Menten** `v = Vmax S/(Km+S)` with a
@@ -592,10 +642,23 @@ slope, intercept = np.polyfit(invT, np.log(k), 1)
 print(f"recovered E = {-slope * R:,.0f} J/mol   (true 50000)")
 print(f"recovered A = {np.exp(intercept):.1f}      (true 1000)")
 """),
+    code("""
+o = np.argsort(invT)
+fig, axes = plt.subplots(1, 2, figsize=(9, 3.6))
+axes[0].plot(T[np.argsort(T)], k[np.argsort(T)], lw=2)
+axes[0].set_xlabel("T (K)"); axes[0].set_ylabel("k")
+axes[0].set_title("k vs T: nonlinear in E (curved)")
+axes[1].scatter(invT, np.log(k), s=12, alpha=0.6, label="data")
+axes[1].plot(invT[o], (slope * invT + intercept)[o], "C3", lw=2, label="linear fit")
+axes[1].set_xlabel("1 / T"); axes[1].set_ylabel("ln k")
+axes[1].set_title(f"Arrhenius plot: slope = -E/R\\nE = {-slope*R:,.0f} J/mol")
+axes[1].legend()
+fig.tight_layout(); plt.show()
+"""),
     md("""
-Transforming to `ln k` vs `1/T` turns the nonlinear-in-parameter problem into a
-linear one. iBART recovers the same structure when given `1/T` (its `inv`
-operator) and the log-transformed target.
+Transforming to `ln k` vs `1/T` turns the curved, nonlinear-in-parameter problem
+into a straight line whose slope gives `E`. iBART recovers the same structure
+when given `1/T` (its `inv` operator) and the log-transformed target.
 """),
     md("### Workaround B -- implicit / null-space form (Michaelis-Menten)"),
     md("""
@@ -633,11 +696,29 @@ print("recovered constraint:", sp.nsimplify(res["constraint"], rational=False).e
 print("residual (0 = exact):", round(res["residual"], 6))
 print("\\ntrue: 5*S - 2*v - S*v = 0  ->  divide by 5:  S - 0.4*v - 0.2*S*v = 0")
 """),
+    md("Reconstructing `v(S)` from the recovered coefficients reproduces the data:"),
+    code("""
+# constraint:  cS*S + cv*v + cSv*S*v + ... = 0  ->  solve for v(S)
+# coef vector aligns with res['terms']; pull the S, v, S*v weights
+terms = res["terms"]; w = res["coef"]
+def wof(name): return w[terms.index(name)]
+cS, cv, cSv = wof("S"), wof("v"), wof("S*v")
+# cS*S + cv*v + cSv*S*v = 0  ->  v = -cS*S / (cv + cSv*S)
+Sg = np.linspace(0.1, 10, 100)
+v_fit = -cS * Sg / (cv + cSv * Sg)
+Vmax_hat, Km_hat = -cS / cSv, cv / cSv
+
+fig, ax = plt.subplots(figsize=(5, 3.6))
+ax.scatter(S, v, s=14, alpha=0.5, label="data")
+ax.plot(Sg, v_fit, "C3", lw=2, label=f"recovered (Vmax={Vmax_hat:.2f}, Km={Km_hat:.2f})")
+ax.set_xlabel("S"); ax.set_ylabel("v"); ax.set_title("Michaelis-Menten via null-space form")
+ax.legend(); fig.tight_layout(); plt.show()
+"""),
     md("""
 The implicit (null-space) formulation recovers the rational Michaelis-Menten
 kinetics **exactly** as an algebraic constraint, from which `Vmax` and `Km` read
-straight off the coefficients. This is the same machinery that underlies the
-DAE foundation (`implicit_constraints`) and SINDy-PI (see
+straight off the coefficients (here Vmax=5, Km=2). This is the same machinery
+that underlies the DAE foundation (`implicit_constraints`) and SINDy-PI (see
 [references](../references.md)).
 
 **Summary:** nonlinear *expressions* -- yes, that is the point. Free parameters

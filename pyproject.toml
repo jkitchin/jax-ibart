@@ -42,3 +42,19 @@ markers = [
 
 [tool.ruff]
 line-length = 88
+# Generated notebooks and throwaway experiment scripts are not lint targets
+# (the notebooks are produced by scripts/build_notebooks.py, which IS linted).
+extend-exclude = [
+    "docs/examples/*.ipynb",
+    "scripts/closing_gap_experiment.py",
+    "scripts/large_budget_experiment.py",
+]
+
+[tool.ruff.lint]
+# E741: allow I, J as math-style index-array names in the FE engine.
+ignore = ["E741"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use `pytest.importorskip(...)` before imports (skip if a backend is
+# absent), which necessarily places imports below module-level code.
+"tests/*" = ["E402"]

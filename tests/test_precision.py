@@ -25,9 +25,9 @@ def test_collinearity_dedup_drops_numeric_duplicate():
     X = np.random.default_rng(1).uniform(-2, 2, size=(40, 1))
     base = engineer.from_primary(X, ["x"])
 
-    abs_pool = engineer.apply_unary(base, [UNARY["abs"]])              # abs(x)
-    sq = engineer.apply_unary(base, [UNARY["sq"]])                     # x**2
-    sqrt_sq = engineer.apply_unary(sq, [UNARY["sqrt"]])               # sqrt(x**2)
+    abs_pool = engineer.apply_unary(base, [UNARY["abs"]])  # abs(x)
+    sq = engineer.apply_unary(base, [UNARY["sq"]])  # x**2
+    sqrt_sq = engineer.apply_unary(sq, [UNARY["sqrt"]])  # sqrt(x**2)
 
     merged = engineer.Pool(
         X=jnp.concatenate([abs_pool.X, sqrt_sq.X], axis=1),

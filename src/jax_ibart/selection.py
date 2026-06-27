@@ -35,8 +35,15 @@ def _bart_varprop(X32, y32, seed, *, n_tree, n_draw, n_burn):
     """
     from bartz.BART import gbart
 
-    m = gbart(X32.T, y32, ntree=n_tree, ndpost=n_draw, nskip=n_burn,
-              seed=int(seed), printevery=None)
+    m = gbart(
+        X32.T,
+        y32,
+        ntree=n_tree,
+        ndpost=n_draw,
+        nskip=n_burn,
+        seed=int(seed),
+        printevery=None,
+    )
     vc = np.asarray(m.varcount_mean, dtype=np.float64)
     total = vc.sum()
     return vc / total if total > 0 else vc
@@ -81,8 +88,14 @@ class BartGSESelector:
         screening threshold (alpha) does. See docs/oracle-crosscheck.md.
     """
 
-    def __init__(self, n_perm: int = 50, alpha: float = 0.10,
-                 n_tree: int = 50, n_draw: int = 1000, n_burn: int = 1000):
+    def __init__(
+        self,
+        n_perm: int = 50,
+        alpha: float = 0.10,
+        n_tree: int = 50,
+        n_draw: int = 1000,
+        n_burn: int = 1000,
+    ):
         self.n_perm = n_perm
         self.alpha = alpha
         self.n_tree = n_tree
@@ -120,7 +133,7 @@ class BartGSESelector:
         #    (1-alpha) quantile of the per-permutation max standardized score.
         mu = null.mean(axis=0)
         sd = null.std(axis=0) + _EPS
-        z_null = (null - mu) / sd            # (n_perm, d)
+        z_null = (null - mu) / sd  # (n_perm, d)
         g = float(np.quantile(z_null.max(axis=1), 1.0 - self.alpha))
 
         # 4. Select where the observed score clears the global threshold.
@@ -149,8 +162,15 @@ class DiffSelector:
         the pool).
     """
 
-    def __init__(self, steps: int = 1500, lr: float = 1e-2, l0: float = 0.03,
-                 hidden: int = 16, threshold: float = 0.5, min_keep: int = 2):
+    def __init__(
+        self,
+        steps: int = 1500,
+        lr: float = 1e-2,
+        l0: float = 0.03,
+        hidden: int = 16,
+        threshold: float = 0.5,
+        min_keep: int = 2,
+    ):
         self.steps = steps
         self.lr = lr
         self.l0 = l0
@@ -163,13 +183,15 @@ class DiffSelector:
 
         from ._diffscreen import screen_importance
 
-        imp = np.asarray(screen_importance(
-            X, y, key, steps=self.steps, lr=self.lr, l0=self.l0,
-            hidden=self.hidden))
+        imp = np.asarray(
+            screen_importance(
+                X, y, key, steps=self.steps, lr=self.lr, l0=self.l0, hidden=self.hidden
+            )
+        )
         keep = imp > self.threshold
         # PAN safeguard: never drop below min_keep (keep top-importance features).
         if keep.sum() < min(self.min_keep, imp.size):
-            top = np.argsort(imp)[::-1][:min(self.min_keep, imp.size)]
+            top = np.argsort(imp)[::-1][: min(self.min_keep, imp.size)]
             keep = np.zeros_like(keep)
             keep[top] = True
         return jax.numpy.asarray(keep)

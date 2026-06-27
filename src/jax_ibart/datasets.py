@@ -88,8 +88,3 @@ def load_reaction():
         dCdt.append(finite_difference(Cb, g["t"].to_numpy(dtype=np.float64)))
         batch.append(np.full(len(g), b))
     return (np.vstack(C), np.vstack(dCdt), species, np.concatenate(batch))
-
-
-def load_metal_dopant():
-    """Load the M-D (doped MgO) dataset -> (X, y, feature_names)."""
-    raise NotImplementedError("M0: wire up the MgO_SL loader")
