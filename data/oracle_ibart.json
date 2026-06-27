@@ -1,0 +1,10 @@
+{
+  "_provenance": "Published iBART results on the single-atom catalysis dataset, reported in Liu et al. (J. Chem. Phys. 156, 164105, 2022) and Ye, Senftle & Li (JASA 119:81-94, 2024) and shipped in the GPL-3 R iBART package as iBART_real_data. Reproduced here as citable published facts for validation/comparison only, with attribution; see NOTICE.md.",
+  "canonical_descriptor": "abs(Hfo/Oxv)",
+  "lzero_1": ["abs((Hfo/Oxv))"],
+  "lzero_2": ["((Hfo*s_EA)/(m_N_val/CMS))", "abs((Hfo/Oxv))"],
+  "lzero_3": ["(s_EA*Hf)", "abs((Hfo/Oxv))", "abs(((m_n13/m_N_val)/Oxv))"],
+  "lzero_5": ["(m_n13/s_phi)", "(Hf/Oxv)", "((Hfo*s_EA)/(m_N_val/CMS))", "((m_n13/m_N_val)/(m_N_val/s_ion_4))", "abs((Hfo/Oxv))"],
+  "lzero_in_sample_rmse": [0.929038903492052, 0.663691738393878, 0.623654969056813, 0.571902387257023, 0.533037072718793],
+  "ibart_full_in_sample_rmse": 0.466459817850376
+}

@@ -1,0 +1,67 @@
+site_name: jax-ibart
+site_description: A JAX-native reimplementation of iBART for symbolic descriptor discovery
+repo_url: https://github.com/jkitchin/jax-ibart
+docs_dir: docs
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - toc.integrate
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+
+plugins:
+  - search
+  - mkdocs-jupyter:
+      include_source: true
+      execute: false
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_root_heading: true
+            show_source: true
+            members_order: source
+            separate_signature: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Comparison to jaxsr: comparison.md
+  - Examples:
+      - Quickstart: examples/01_quickstart.ipynb
+      - Catalysis case study: examples/02_catalysis.ipynb
+      - bart vs diff backends: examples/03_backends.ipynb
+      - Custom operators & units: examples/04_custom_operators_units.ipynb
+      - Dynamical systems (SINDy/DAE): examples/05_dynamics.ipynb
+      - Reaction kinetics (BART): examples/06_reaction_kinetics.ipynb
+      - What iBART can/can't find: examples/07_nonlinear.ipynb
+      - Uncertainty quantification: examples/08_uncertainty.ipynb
+  - Validation:
+      - Catalysis result: validation-catalysis.md
+      - R-iBART oracle cross-check: oracle-crosscheck.md
+      - Benchmarks: benchmark.md
+  - API reference: api.md
+  - References: references.md

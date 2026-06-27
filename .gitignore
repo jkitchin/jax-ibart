@@ -1,0 +1,38 @@
+# Crucible: external sources (copyrighted, not shareable)
+.crucible/sources/external/
+
+# Crucible: database (regenerable from wiki via auto-rebuild)
+.crucible/crucible.db
+.crucible/crucible.db-wal
+.crucible/crucible.db-shm
+
+# Crucible: publish output
+.crucible/wiki/_build/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+.venv/
+uv.lock
+
+# Downloaded dataset fixtures
+data/*.csv
+data/*.json
+# ...but keep the public catalysis validation fixture (from R iBART package)
+!data/catalysis_X.csv
+!data/catalysis_y.csv
+!data/oracle_ibart.json
+site/
+!data/reaction_kinetics.csv
+
+# Build cache and local tooling (not part of the package)
+.cache/
+.claude/
+# Crucible knowledge-base instance (separate tool; machine-specific paths)
+.crucible/
+CLAUDE.md
