@@ -26,6 +26,7 @@ data/*.json
 # ...but keep the public catalysis validation fixture (from R iBART package)
 !data/catalysis_X.csv
 !data/catalysis_y.csv
+!data/catalysis_unit.csv
 !data/oracle_ibart.json
 site/
 !data/reaction_kinetics.csv
