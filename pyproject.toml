@@ -1,6 +1,6 @@
 [project]
 name = "jax-ibart"
-version = "0.0.1"
+dynamic = ["version"]
 description = "JAX-native reimplementation of iBART (iterative Bayesian Additive Regression Trees) for symbolic descriptor discovery"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,8 +37,19 @@ all = ["bartz>=0.7,<0.11", "optax>=0.2", "pytest>=8.0", "matplotlib>=3.8"]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+path = "src/jax_ibart/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/jax_ibart"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    ".github",
+    ".pre-commit-config.yaml",
+    "scripts/closing_gap_experiment.py",
+    "scripts/large_budget_experiment.py",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

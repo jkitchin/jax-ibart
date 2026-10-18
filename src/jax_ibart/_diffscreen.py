@@ -19,6 +19,8 @@ host-side in float64 numpy).
 
 from __future__ import annotations
 
+import functools
+
 import jax
 import jax.numpy as jnp
 import optax
@@ -59,6 +61,37 @@ def _mlp(params, Xg):
     return (h @ params["W2"] + params["b2"]).ravel()
 
 
+def _loss(params, Xs, yc, l0, key):
+    z = _sample_gate(params["log_alpha"], key)
+    pred = _mlp(params, Xs * z)
+    mse = jnp.mean((yc - pred) ** 2)
+    # Expected L0 = sum of gate-open probabilities. Penalize the *count* (not the
+    # mean): keeping a useless gate open must cost ~l0 regardless of d, so noise
+    # gates close while predictive gates stay open.
+    l0_pen = jnp.sum(_open_prob(params["log_alpha"]))
+    return mse + l0 * l0_pen
+
+
+@functools.partial(jax.jit, static_argnames=("steps", "lr", "hidden"))
+def _train(Xs, yc, key, l0, *, steps, lr, hidden):
+    """The whole optimization as one compiled ``lax.scan`` over ``steps``."""
+    key, ik = jax.random.split(key)
+    params = _init_params(ik, Xs.shape[1], hidden)
+    opt = optax.adam(lr)
+
+    def body(carry, _):
+        params, opt_state, key = carry
+        key, sk = jax.random.split(key)
+        grads = jax.grad(_loss)(params, Xs, yc, l0, sk)
+        updates, opt_state = opt.update(grads, opt_state, params)
+        return (optax.apply_updates(params, updates), opt_state, key), None
+
+    (params, _, _), _ = jax.lax.scan(
+        body, (params, opt.init(params), key), None, length=steps
+    )
+    return _open_prob(params["log_alpha"])
+
+
 def screen_importance(X, y, key, *, steps=1500, lr=1e-2, l0=0.03, hidden=16):
     """Train the gated MLP and return per-feature importances in [0, 1].
 
@@ -69,31 +102,6 @@ def screen_importance(X, y, key, *, steps=1500, lr=1e-2, l0=0.03, hidden=16):
     y = jnp.asarray(y, dtype=jnp.float32)
     Xs = (X - X.mean(0)) / (X.std(0) + 1e-6)
     yc = (y - y.mean()) / (y.std() + 1e-6)
-    d = Xs.shape[1]
-
-    key, ik = jax.random.split(key)
-    params = _init_params(ik, d, hidden)
-    opt = optax.adam(lr)
-    opt_state = opt.init(params)
-
-    def loss_fn(params, key):
-        z = _sample_gate(params["log_alpha"], key)
-        pred = _mlp(params, Xs * z)
-        mse = jnp.mean((yc - pred) ** 2)
-        # Expected L0 = sum of gate-open probabilities. Penalize the *count*
-        # (not the mean): keeping a useless gate open must cost ~l0 regardless
-        # of d, so noise gates close while predictive gates stay open.
-        l0_pen = jnp.sum(_open_prob(params["log_alpha"]))
-        return mse + l0 * l0_pen
-
-    @jax.jit
-    def step(params, opt_state, key):
-        loss, grads = jax.value_and_grad(loss_fn)(params, key)
-        updates, opt_state = opt.update(grads, opt_state, params)
-        return optax.apply_updates(params, updates), opt_state, loss
-
-    for _ in range(steps):
-        key, sk = jax.random.split(key)
-        params, opt_state, _ = step(params, opt_state, sk)
-
-    return _open_prob(params["log_alpha"])
+    return _train(
+        Xs, yc, key, jnp.float32(l0), steps=int(steps), lr=float(lr), hidden=int(hidden)
+    )

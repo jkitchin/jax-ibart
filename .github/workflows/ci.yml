@@ -19,12 +19,44 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install (with all backends)
+        run: pip install -e ".[all]"
+      - name: Run tests
+        run: pytest -q   # slow tests are deselected by default (see pyproject)
+
+  # Build the wheel and use it from outside the source tree, so a packaging
+  # mistake (e.g. data files missing from the wheel) cannot hide behind the
+  # editable install above.
+  wheel:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install (with all backends)
-        run: pip install -e ".[all]"
-      - name: Run tests
-        run: pytest -q   # slow tests are deselected by default (see pyproject)
+      - name: Build
+        run: pip install build && python -m build
+      - name: Install the wheel in a clean venv
+        run: |
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install "$(ls dist/*.whl)[bart]"
+      - name: Smoke test
+        working-directory: /tmp
+        run: |
+          /tmp/venv/bin/python - <<'EOF'
+          import jax_ibart
+          from jax_ibart.datasets import load_metal_support, load_reaction
+          X, y, names, units = load_metal_support()
+          assert X.shape == (91, 59), X.shape
+          load_reaction()
+          print("jax-ibart", jax_ibart.__version__, "OK from", jax_ibart.__file__)
+          EOF

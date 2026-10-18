@@ -70,7 +70,7 @@ descriptors appear varies with the stochastic BART screen and the seed.
 ## Differentiable backend (`backend="diff"`)
 
 The same schedule with the hard-concrete-L0 screener instead of BART-G.SE
-(`steps=1000, l0=0.03`, `n_keep=10`) runs in about 5 s, roughly 5x faster than
+(`steps=1000, l0=0.03`, `n_keep=10`) runs in a few seconds, several times faster than
 the bart run above, with in-sample RMSE 1.090 eV. It also finds
 `Oxv`-normalized descriptors (`Abs(Hf/Oxv)`), but its selection is noisier
 than BART's permutation-null screen on this collinear problem (n = 91,

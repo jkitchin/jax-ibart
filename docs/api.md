@@ -36,6 +36,8 @@ Auto-generated from the source docstrings.
 
 ## Final parametric stage
 
+::: jax_ibart.sparsify.ols
+
 ::: jax_ibart.sparsify.lasso_screen
 
 ::: jax_ibart.sparsify.l0_best_subset

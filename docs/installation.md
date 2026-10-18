@@ -1,7 +1,7 @@
 # Installation
 
-`jax-ibart` is pure Python and needs no JVM. It is not on PyPI yet; install it
-from GitHub:
+`jax-ibart` is pure Python and needs no JVM; it is tested on Python 3.10-3.13.
+It is not on PyPI yet; install it from GitHub:
 
 ```bash
 pip install "jax-ibart[bart] @ git+https://github.com/jkitchin/jax-ibart"   # recommended

@@ -48,6 +48,10 @@ def finite_difference(X_t, t):
     """
     X_t = np.asarray(X_t, dtype=np.float64)
     t = np.asarray(t, dtype=np.float64)
+    if X_t.ndim != 2 or X_t.shape[0] < 2:
+        raise ValueError("X_t must be (n_time, n_state) with at least 2 time points")
+    if t.shape != (X_t.shape[0],):
+        raise ValueError(f"t must have shape ({X_t.shape[0]},), got {t.shape}")
     dX = np.empty_like(X_t)
     dX[1:-1] = (X_t[2:] - X_t[:-2]) / (t[2:] - t[:-2])[:, None]
     dX[0] = (X_t[1] - X_t[0]) / (t[1] - t[0])
@@ -73,6 +77,8 @@ def polynomial_library(
     discovery: there, collinearity among library columns *is* the constraint we
     want to find, so dropping it would discard the answer.
     """
+    if degree not in (1, 2):
+        raise ValueError(f"degree must be 1 or 2, got {degree}")
     cmd = 10000 if dedup_collinear else 0
     lin = engineer.from_primary(X, feature_names, units=units)
     blocks = [lin]
@@ -164,6 +170,8 @@ def discover_ode(
     """
     import jax
 
+    if screen not in (None, "bart"):
+        raise ValueError(f"screen must be None or 'bart', got {screen!r}")
     X_t = np.asarray(X_t, dtype=np.float64)
     dX = finite_difference(X_t, t) if dXdt is None else np.asarray(dXdt, np.float64)
 
@@ -194,7 +202,7 @@ def discover_ode(
         # relative to the largest, then refit OLS on the survivors.
         slopes = coef[1:]
         big = np.abs(slopes) > coef_threshold * (np.abs(slopes).max() + 1e-30)
-        idx = [j for j, keep in zip(idx, big) if keep]
+        idx = [j for j, b in zip(idx, big) if b]
         cols = [L[:, cand[j]] for j in idx]
         A = (
             np.column_stack([np.ones(len(yi))] + cols)
@@ -202,7 +210,7 @@ def discover_ode(
             else np.ones((len(yi), 1))
         )
         coef, _ = (
-            sparsify._ols(np.column_stack(cols), yi)
+            sparsify.ols(np.column_stack(cols), yi)
             if cols
             else (np.array([yi.mean()]), 0.0)
         )

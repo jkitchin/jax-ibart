@@ -17,6 +17,10 @@ import numpy as np
 from sklearn.linear_model import LassoLarsCV
 
 
+# Fewest samples per cross-validation fold in the LASSO screen.
+_MIN_FOLD = 2
+
+
 def _as_f64(X, y):
     return np.asarray(X, dtype=np.float64), np.asarray(y, dtype=np.float64)
 
@@ -38,9 +42,13 @@ def lasso_screen(X, y, n_keep: int = 10) -> np.ndarray:
     Xs = (X - mu) / sd
     yc = y - y.mean()
 
-    coef = LassoLarsCV(cv=min(5, n), max_iter=2000).fit(Xs, yc).coef_
-    ranked = list(np.argsort(np.abs(coef))[::-1])
-    chosen = [j for j in ranked if coef[j] != 0.0][:n_keep]
+    if n < 2 * _MIN_FOLD:  # too few samples to cross-validate the LASSO path
+        chosen = []
+    else:
+        cv = min(5, n // _MIN_FOLD)
+        coef = LassoLarsCV(cv=cv, max_iter=2000).fit(Xs, yc).coef_
+        ranked = list(np.argsort(np.abs(coef))[::-1])
+        chosen = [j for j in ranked if coef[j] != 0.0][:n_keep]
 
     if len(chosen) < n_keep:  # fill from univariate correlation
         corr = np.abs(Xs.T @ yc) / n
@@ -52,8 +60,13 @@ def lasso_screen(X, y, n_keep: int = 10) -> np.ndarray:
     return np.asarray(chosen[:n_keep], dtype=int)
 
 
-def _ols(X, y):
-    """OLS with intercept (f64). Returns (coef_with_intercept, rss)."""
+def ols(X, y):
+    """Ordinary least squares with an intercept, in float64.
+
+    Returns ``(coef, rss)`` where ``coef`` is ``[intercept, *slopes]`` and
+    ``rss`` is the residual sum of squares.
+    """
+    X, y = _as_f64(X, y)
     A = np.column_stack([np.ones(len(y)), X])
     beta, *_ = np.linalg.lstsq(A, y, rcond=None)
     resid = y - A @ beta
@@ -66,13 +79,18 @@ def _bic(rss, n, k):
     return n * np.log(rss / n) + k * np.log(n)
 
 
+_ols = ols  # backward-compatible alias
+
+
 def _cv_mse(X, y, n_splits=5):
     n = len(y)
-    folds = np.array_split(np.arange(n), min(n_splits, n))
+    # Shuffle once (fixed seed) so sorted inputs don't give biased folds.
+    perm = np.random.default_rng(0).permutation(n)
+    folds = np.array_split(perm, min(n_splits, n))
     se = 0.0
     for f in folds:
         tr = np.setdiff1d(np.arange(n), f)
-        beta, _ = _ols(X[tr], y[tr])
+        beta, _ = ols(X[tr], y[tr])
         pred = np.column_stack([np.ones(len(f)), X[f]]) @ beta
         se += float(((y[f] - pred) ** 2).sum())
     return se / n
@@ -97,7 +115,7 @@ def l0_best_subset(X, y, max_dim: int = 3, score: str = "bic"):
         Xs = X[:, list(cols)]
         if score == "cv":
             return _cv_mse(Xs, y)
-        _, rss = _ols(Xs, y)
+        _, rss = ols(Xs, y)
         return _bic(rss, n, k=len(cols) + 1)
 
     best_cols, best_score = None, np.inf
@@ -107,5 +125,5 @@ def l0_best_subset(X, y, max_dim: int = 3, score: str = "bic"):
             if s < best_score:
                 best_score, best_cols = s, cols
 
-    coef, _ = _ols(X[:, list(best_cols)], y)
+    coef, _ = ols(X[:, list(best_cols)], y)
     return np.asarray(best_cols, dtype=int), coef

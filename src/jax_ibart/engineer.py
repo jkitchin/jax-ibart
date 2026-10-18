@@ -18,8 +18,7 @@ import jax.numpy as jnp
 import numpy as np
 import sympy as sp
 
-from .operators import Operator, UNARY, BINARY  # noqa: F401  (re-exported)
-from .operators import u_same, u_add, u_sub
+from .operators import Operator, u_add, u_same, u_sub
 
 
 @dataclass
@@ -116,6 +115,17 @@ def apply_binary(pool: Pool, ops: list[Operator], corr_max_d: int = 10000) -> Po
                 new_u = np.array([u for u, _, _ in keep])
                 I = np.array([a for _, a, _ in keep])
                 J = np.array([b for _, _, b in keep])
+            if I.size == 0:
+                continue
+
+        ok = np.asarray(op.valid(pool.X[:, I], pool.X[:, J]), dtype=bool)
+        if ok.ndim == 0:
+            if not ok:
+                continue
+        else:
+            I, J = I[ok], J[ok]
+            if has_units:
+                new_u = new_u[ok]
             if I.size == 0:
                 continue
 

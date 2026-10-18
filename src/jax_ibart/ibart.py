@@ -9,6 +9,8 @@ keeping the active descriptor pool small at every step.
 
 from __future__ import annotations
 
+import warnings
+
 import jax
 import numpy as np
 import sympy as sp
@@ -136,13 +138,25 @@ class IBart:
         """A fresh, unfitted copy with the same configuration."""
         return IBart(**self.get_params())
 
-    def fit(self, X, y, feature_names: list[str], units=None):
+    def fit(self, X, y, feature_names: list[str] | None = None, units=None):
         """Fit iBART.
+
+        ``feature_names`` defaults to the columns of a pandas DataFrame ``X``,
+        or ``x0, x1, ...``. Names become the symbols in the discovered
+        expressions.
 
         ``units`` (optional): an (n_features, n_dims) integer unit-exponent
         matrix. When given, descriptors that are dimensionally inconsistent
         (e.g. summing two different units) are never generated.
         """
+        if feature_names is None:
+            cols = getattr(X, "columns", None)
+            p = np.shape(X)[1] if np.ndim(X) == 2 else 0
+            feature_names = (
+                [str(c) for c in cols]
+                if cols is not None
+                else [f"x{i}" for i in range(p)]
+            )
         X, y, feature_names, units = _check_inputs(X, y, feature_names, units)
         if self.score not in ("bic", "cv"):
             raise ValueError(f"score must be 'bic' or 'cv', got {self.score!r}")
@@ -204,7 +218,30 @@ class IBart:
         self.descriptors_ = [pool.exprs[cand[i]] for i in local]
         self.coef_ = coef
         self.history_ = history
+        self._check_consistency(X, [cand[i] for i in local])
         return self
+
+    def _check_consistency(self, X, cols):
+        """Warn if the symbolic descriptors don't reproduce their numeric columns.
+
+        That happens when a custom operator's ``fn`` and ``sym`` disagree, and
+        would make ``predict`` silently differ from the fitted model.
+        """
+        num = np.asarray(self.pool_.X, dtype=np.float64)[:, cols]
+        with np.errstate(all="ignore"):
+            sym = self.transform(X)
+        scale = np.abs(num).max(axis=0) + 1e-12
+        bad = [
+            str(self.descriptors_[k])
+            for k in range(len(cols))
+            if not np.allclose(sym[:, k] / scale[k], num[:, k] / scale[k], atol=1e-3)
+        ]
+        if bad:
+            warnings.warn(
+                "symbolic and numeric forms disagree on the training data for "
+                f"{bad}; check custom operators' fn and sym",
+                stacklevel=3,
+            )
 
     def _screen(self, pool, y, key):
         """Run the selection backend and reduce the pool, preserving units.
@@ -253,8 +290,17 @@ class IBart:
         ``log`` and ``sqrt`` give NaN outside their real domain (the training
         pipeline evaluates them on ``|x|``).
         """
-        D = self.transform(X)
-        return self.coef_[0] + D @ self.coef_[1:]
+        with np.errstate(all="ignore"):
+            D = self.transform(X)
+        pred = self.coef_[0] + D @ self.coef_[1:]
+        if not np.isfinite(pred).all():
+            warnings.warn(
+                f"{int((~np.isfinite(pred)).sum())} predictions are NaN or inf; "
+                "inputs are probably outside a descriptor's domain (e.g. log of a "
+                "non-positive value)",
+                stacklevel=2,
+            )
+        return pred
 
     def expression(self, digits: int = 4) -> sp.Expr:
         """The fitted model as a single symbolic expression.

@@ -4,8 +4,10 @@ Each operator bundles three views that must stay consistent:
 
 * ``fn``      : a JAX-jittable numeric function over feature columns.
 * ``sym``     : a SymPy-level symbolic function (provenance / interpretability).
-* ``valid``   : a domain-validity predicate returning a boolean mask of columns
-                (or column-pairs) for which the operator is defined on the data.
+* ``valid``   : a domain-validity predicate. Unary: called on the (n, d) pool,
+                returns a (d,) boolean mask of columns to transform. Binary:
+                called on the (n, k) left and right operand slices, returns a
+                single bool or a (k,) mask of pairs to keep.
 
 The numeric side lives inside JAX traces; the symbolic side lives on the host
 and is indexed in lockstep with the numeric columns. The two are never mixed
