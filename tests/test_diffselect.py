@@ -91,3 +91,13 @@ def test_ibart_diff_backend_end_to_end():
     pred = model.predict(X)
     r2 = 1 - ((y - pred) ** 2).sum() / ((y - y.mean()) ** 2).sum()
     assert r2 > 0.95
+
+
+def test_diff_exposes_importance():
+    X, y = _friedman()
+    sel = DiffSelector(steps=1500)
+    keep = np.asarray(sel.select(X, y, key=jax.random.PRNGKey(0)))
+    imp = np.asarray(sel.importance_)
+    assert imp.shape == (X.shape[1],)
+    assert (imp[:2] > sel.threshold).all() and (imp[2:] < sel.threshold).all()
+    assert keep[0] and keep[1]

@@ -252,14 +252,14 @@ def bart_posterior_intervals(
     descriptors (it does not propagate selection uncertainty -- use
     :func:`selection_stability` for that). Requires ``bartz``.
     """
-    from bartz.BART import gbart
+    from .selection import bartz_layout, fit_gbart
 
     D_tr = np.asarray(model._design(X_train), dtype=np.float32)
     D_new = np.asarray(model._design(X_new), dtype=np.float32)
     y = np.asarray(y_train, dtype=np.float32)
 
-    m = gbart(
-        D_tr.T,
+    m = fit_gbart(
+        D_tr,
         y,
         ntree=n_tree,
         ndpost=n_draw,
@@ -267,7 +267,9 @@ def bart_posterior_intervals(
         seed=int(seed),
         printevery=None,
     )
-    fhat = np.asarray(m.predict(D_new.T), dtype=np.float64)  # (ndpost, n_new)
+    fhat = np.asarray(
+        m.predict(bartz_layout(D_new)), dtype=np.float64
+    )  # (ndpost, n_new)
     sigma = np.asarray(m.sigma, dtype=np.float64)[-n_draw:]  # post-burn draws
 
     rng = np.random.default_rng(seed)

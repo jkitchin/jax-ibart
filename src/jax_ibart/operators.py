@@ -9,7 +9,7 @@ Each operator bundles three views that must stay consistent:
 
 The numeric side lives inside JAX traces; the symbolic side lives on the host
 and is indexed in lockstep with the numeric columns. The two are never mixed
-inside a trace. See PLAN-jax-ibart.md ("Division of labor: JAX vs Python").
+inside a trace.
 """
 
 from __future__ import annotations

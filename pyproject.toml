@@ -19,12 +19,15 @@ dependencies = [
 
 [project.optional-dependencies]
 # Faithful BART-G.SE selection backend (the correctness oracle path).
-bart = ["bartz>=0.7"]
+# bartz 0.11 changed the input layout and 0.11-0.13 change the BART-G.SE screen
+# enough that the validated catalysis results no longer reproduce; see
+# docs/oracle-crosscheck.md. Re-validate before lifting this pin.
+bart = ["bartz>=0.7,<0.11"]
 # Differentiable end-to-end selection backend (hard-concrete L0 gates).
 diff = ["optax>=0.2"]
 dev = ["pytest>=8.0", "matplotlib>=3.8"]
 docs = ["mkdocs-material>=9.5", "mkdocstrings[python]>=0.24", "mkdocs-jupyter>=0.24"]
-all = ["bartz>=0.7", "optax>=0.2", "pytest>=8.0", "matplotlib>=3.8"]
+all = ["bartz>=0.7,<0.11", "optax>=0.2", "pytest>=8.0", "matplotlib>=3.8"]
 
 [build-system]
 requires = ["hatchling"]

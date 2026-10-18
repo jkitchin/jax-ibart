@@ -144,8 +144,7 @@ def clean(pool: Pool, corr_thresh: float = 1 - 1e-8, corr_max_d: int = 10000) ->
     All numeric *decisions* are made in float64 (host-side numpy), even though
     the columns are stored f32 for the bartz pipeline: collinearity/rank
     judgements on small-n, highly correlated engineered descriptors are exactly
-    where f32's ~7 digits are not enough. See PLAN-jax-ibart.md (precision
-    policy). The returned pool keeps the original f32 columns; only the
+    where f32's ~7 digits are not enough. The returned pool keeps the original f32 columns; only the
     keep/drop choices use f64.
     """
     X64 = np.asarray(pool.X, dtype=np.float64)

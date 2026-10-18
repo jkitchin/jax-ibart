@@ -17,8 +17,8 @@ References: Liu et al. 2022 (*J. Chem. Phys.* 156:164105); Ye, Senftle & Li 2024
 
 ## Status
 
-Early scaffold (M0/M1). See [`PLAN-jax-ibart.md`](PLAN-jax-ibart.md) for the full
-design and milestones.
+All planned milestones (M0-M5) are done, and the package is validated against the
+published iBART results on the catalysis dataset.
 
 - [x] Package skeleton, `pyproject`, dataset stubs, test harness (M0)
 - [x] Operator algebra + feature-engineering engine + symbolic provenance (M1)
@@ -66,13 +66,28 @@ uv pip install -e ".[docs]"
 mkdocs serve        # http://127.0.0.1:8000
 ```
 
-- Worked notebooks under [`docs/examples/`](docs/examples/): quickstart, the
-  catalysis case study, `bart` vs `diff` backends, and custom operators/units.
+- Worked notebooks under [`docs/examples/`](docs/examples/), with rendered
+  outputs:
+  1. [Quickstart](docs/examples/01_quickstart.ipynb): the grow-and-prune loop
+     on a hidden `a*b`.
+  2. [Catalysis case study](docs/examples/02_catalysis.ipynb): 91 points, 59
+     features, compared with the published `|Hfo/Oxv|` result.
+  3. [`bart` vs `diff` backends](docs/examples/03_backends.ipynb): what each
+     screen computes, and when to use which.
+  4. [Custom operators and units](docs/examples/04_custom_operators_units.ipynb):
+     the unit filter, and adding a `T^4` operator for Stefan-Boltzmann.
+  5. [Dynamical systems](docs/examples/05_dynamics.ipynb): SINDy on Lorenz and
+     implicit constraints.
+  6. [Reaction kinetics](docs/examples/06_reaction_kinetics.ipynb): rate laws
+     from noisy batch data, and why derivative smoothing matters.
+  7. [What iBART can and can't find](docs/examples/07_nonlinear.ipynb).
+  8. [Uncertainty quantification](docs/examples/08_uncertainty.ipynb).
 - Validation: [`docs/validation-catalysis.md`](docs/validation-catalysis.md),
   the [R-iBART oracle cross-check](docs/oracle-crosscheck.md), and
   [benchmarks](docs/benchmark.md).
 - Rebuild the example notebooks: `python scripts/build_notebooks.py` then
-  `jupyter nbconvert --to notebook --execute --inplace docs/examples/*.ipynb`.
+  `uv run --extra all --with nbconvert --with ipykernel jupyter nbconvert --to notebook --execute --inplace docs/examples/*.ipynb`.
+  The docs show the committed outputs (notebooks are not executed at build time).
 
 ## Comparison to [jaxsr](https://github.com/jkitchin/jaxsr)
 

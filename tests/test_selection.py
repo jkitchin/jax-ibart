@@ -32,6 +32,11 @@ def test_gse_keeps_signal_rejects_noise():
     # Most of the 6 noise features rejected (allow at most one false positive).
     assert keep[2:].sum() <= 1
 
+    # Diagnostics expose the evidence behind the decision.
+    dg = sel.diagnostics_
+    assert dg["null"].shape == (15, X.shape[1])
+    assert np.array_equal(keep, dg["q_obs"] > dg["threshold"])
+
 
 def test_factory_returns_bart_backend():
     assert isinstance(make_selector("bart"), BartGSESelector)

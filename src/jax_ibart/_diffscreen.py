@@ -13,7 +13,8 @@ differentiable end to end: gradients flow through the reparameterized gates,
 which is the defining property of this backend. After training, each gate's
 open-probability is the per-feature importance.
 
-Pure JAX + optax, float32 (global x64 stays off; see PLAN precision policy).
+Pure JAX + optax, float32 (global x64 stays off; precision-sensitive decisions are made
+host-side in float64 numpy).
 """
 
 from __future__ import annotations

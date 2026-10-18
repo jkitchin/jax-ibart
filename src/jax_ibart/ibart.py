@@ -4,8 +4,7 @@ Drives the interleaved feature-engineering / feature-selection schedule, e.g.
 
     BART -> O2 -> BART -> O1 -> BART -> O2 -> LASSO -> l0
 
-keeping the active descriptor pool small at every step. See
-PLAN-jax-ibart.md for the full design.
+keeping the active descriptor pool small at every step.
 """
 
 from __future__ import annotations
@@ -40,6 +39,17 @@ class IBart:
         Selection score for the l0 best-subset.
     seed : int
         PRNG seed for the (functional) selection randomness.
+    unary_ops, binary_ops : list of :class:`~jax_ibart.operators.Operator`, optional
+        Operator sets for the ``"u"`` and ``"b"`` steps. Default to
+        :func:`~jax_ibart.operators.default_unary` and
+        :func:`~jax_ibart.operators.default_binary` (the catalysis-study sets).
+    carry_selected : bool
+        If True, each screen's survivors are unioned with everything kept by
+        earlier screens, and that union feeds the next engineering step and the
+        final LASSO/l0 stage. This is what the R iBART package does
+        (``X_selected`` accumulates across iterations). If False (default), a
+        binary step replaces the pool, so a descriptor kept in one round can
+        drop out of the final pool.
 
     Attributes (after ``fit``)
     --------------------------
@@ -47,6 +57,12 @@ class IBart:
         The selected descriptors (symbolic, interpretable).
     coef_ : np.ndarray
         OLS coefficients ``[intercept, *slopes]`` aligned with ``descriptors_``.
+    history_ : list[dict]
+        One record per pipeline stage, ``{"stage", "generated", "kept"}``: the
+        pool size after feature engineering and after screening. Shows the
+        grow-then-prune rhythm that keeps iBART tractable.
+    pool_ : engineer.Pool
+        The final screened descriptor pool that the LASSO/l0 stage chose from.
     """
 
     def __init__(
@@ -58,6 +74,9 @@ class IBart:
         score: str = "bic",
         screen_primaries: bool = False,
         seed: int = 0,
+        unary_ops=None,
+        binary_ops=None,
+        carry_selected: bool = False,
         **selector_kwargs,
     ):
         self.backend = backend
@@ -75,10 +94,15 @@ class IBart:
         # (Found via the R-iBART oracle cross-check.)
         self.screen_primaries = screen_primaries
         self.seed = seed
+        self.unary_ops = unary_ops
+        self.binary_ops = binary_ops
+        self.carry_selected = carry_selected
         self._selector_kwargs = dict(selector_kwargs)
         self.selector = make_selector(backend, **selector_kwargs)
         self.descriptors_ = None
         self.coef_ = None
+        self.history_ = None
+        self.pool_ = None
         self._feature_names = None
 
     def get_params(self) -> dict:
@@ -91,6 +115,9 @@ class IBart:
             score=self.score,
             screen_primaries=self.screen_primaries,
             seed=self.seed,
+            unary_ops=self.unary_ops,
+            binary_ops=self.binary_ops,
+            carry_selected=self.carry_selected,
             **self._selector_kwargs,
         )
 
@@ -108,13 +135,21 @@ class IBart:
         self._feature_names = list(feature_names)
         y = np.asarray(y, dtype=np.float64)
         key = jax.random.PRNGKey(self.seed)
-        unary, binary = default_unary(), default_binary()
+        unary = default_unary() if self.unary_ops is None else list(self.unary_ops)
+        binary = default_binary() if self.binary_ops is None else list(self.binary_ops)
         pool = engineer.from_primary(X, feature_names, units=units)
+        n = pool.n_descriptors
+        self.history_ = [{"stage": "primary", "generated": n, "kept": n}]
+
+        # Union of everything kept so far (used when carry_selected).
+        selected = None
 
         # Leading screen on the primary features (matches R iBART).
         if self.screen_primaries and pool.n_descriptors > 1:
             key, sk = jax.random.split(key)
             pool = self._screen(pool, y, sk)
+            self.history_[0]["kept"] = pool.n_descriptors
+            selected = pool
 
         for step in self.schedule:
             pool = (
@@ -122,12 +157,20 @@ class IBart:
                 if step == "u"
                 else engineer.apply_binary(pool, binary)
             )
-            if pool.n_descriptors == 0:
+            generated = pool.n_descriptors
+            if generated == 0:
                 break
             key, sk = jax.random.split(key)
             pool = self._screen(pool, y, sk)
+            if self.carry_selected:
+                selected = pool if selected is None else _union(selected, pool)
+                pool = selected
+            self.history_.append(
+                {"stage": step, "generated": generated, "kept": pool.n_descriptors}
+            )
 
         # Final parametric stage: LASSO screen -> l0 best subset (f64 host-side).
+        self.pool_ = pool
         Xpool = np.asarray(pool.X, dtype=np.float64)
         cand = sparsify.lasso_screen(Xpool, y, n_keep=self.n_keep)
         local, coef = sparsify.l0_best_subset(
@@ -135,6 +178,9 @@ class IBart:
         )
         self.descriptors_ = [pool.exprs[cand[i]] for i in local]
         self.coef_ = coef
+        self.history_.append(
+            {"stage": "l0", "generated": len(cand), "kept": len(self.descriptors_)}
+        )
         return self
 
     def _screen(self, pool, y, key):
@@ -193,3 +239,15 @@ class IBart:
         if self.coef_ is None:
             return "IBart(unfitted)"
         return f"${self.latex()}$"
+
+
+def _union(a, b):
+    """Columns of ``a`` followed by those of ``b``, duplicates removed."""
+    units = None if a.units is None else np.concatenate([a.units, b.units], axis=0)
+    return engineer.clean(
+        engineer.Pool(
+            X=jax.numpy.concatenate([a.X, b.X], axis=1),
+            exprs=list(a.exprs) + list(b.exprs),
+            units=units,
+        )
+    )

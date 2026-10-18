@@ -12,7 +12,6 @@ Two interchangeable backends sit behind one :class:`Selector` interface:
 
 Both must satisfy the PAN criterion: over-selection (false positives) is fine,
 but a needed intermediate descriptor must not be dropped (no false negatives).
-See PLAN-jax-ibart.md, decision (2).
 """
 
 from __future__ import annotations
@@ -25,18 +24,42 @@ import numpy as np
 _EPS = 1e-9
 
 
+def bartz_layout(X):
+    """Orient an ``(n, p)`` predictor matrix the way the installed bartz wants.
+
+    bartz <= 0.10 takes predictors as ``(p, n)``; 0.11 switched to ``(n, p)``.
+    """
+    from importlib.metadata import version
+
+    major, minor = (int(v) for v in version("bartz").split(".")[:2])
+    return X if (major, minor) >= (0, 11) else X.T
+
+
+def fit_gbart(X, y, **kwargs):
+    """Fit ``bartz.BART.gbart`` on an ``(n, p)`` matrix, across bartz versions.
+
+    With ``p >= n`` (the normal case in an iBART screen) the OLS estimate of the
+    noise scale does not exist; like R ``BART`` we then fall back to ``sd(y)``,
+    which bartz >= 0.13 requires to be passed explicitly.
+    """
+    from bartz.BART import gbart
+
+    n, p = X.shape
+    if p >= n:
+        kwargs.setdefault("sigest", float(np.std(y)))
+    return gbart(bartz_layout(X), y, **kwargs)
+
+
 def _bart_varprop(X32, y32, seed, *, n_tree, n_draw, n_burn):
     """Fit bartz and return per-variable inclusion *proportions* (sums to 1).
 
     ``varcount_mean`` is the histogram of predictor usage in decision rules;
     normalizing to a proportion makes fits on real and permuted data
-    comparable. bartz expects ``(p, n)`` layout and an int seed, and must run
-    in float32 (x64 breaks its MCMC scan carry).
+    comparable. bartz needs an int seed and must run in float32 (x64 breaks
+    its MCMC scan carry); see :func:`fit_gbart` for version handling.
     """
-    from bartz.BART import gbart
-
-    m = gbart(
-        X32.T,
+    m = fit_gbart(
+        X32,
         y32,
         ntree=n_tree,
         ndpost=n_draw,
@@ -138,6 +161,9 @@ class BartGSESelector:
 
         # 4. Select where the observed score clears the global threshold.
         keep = (q_obs - mu) / sd > g
+        # Diagnostics from the last call, for plotting: a column is kept where
+        # q_obs > threshold, i.e. its usage beats the permutation null.
+        self.diagnostics_ = {"q_obs": q_obs, "null": null, "threshold": mu + g * sd}
         return jax.numpy.asarray(keep)
 
 
@@ -188,6 +214,7 @@ class DiffSelector:
                 X, y, key, steps=self.steps, lr=self.lr, l0=self.l0, hidden=self.hidden
             )
         )
+        self.importance_ = imp  # last call's gate-open probabilities
         keep = imp > self.threshold
         # PAN safeguard: never drop below min_keep (keep top-importance features).
         if keep.sum() < min(self.min_keep, imp.size):

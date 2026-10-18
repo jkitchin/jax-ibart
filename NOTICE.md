@@ -33,10 +33,13 @@ This project does **not** depend on the GPL `bartMachine` package.
 
 ## Bundled data
 
-- `data/catalysis_X.csv`, `data/catalysis_y.csv`: the single-atom catalysis
-  primary features and metal/oxide binding energies. The underlying data
-  originate from the Senftle group's `tsenftle/Metal-Oxide-LASSO-lo` repository,
-  which is **MIT licensed** (Copyright (c) 2018 tsenftle). Numeric DFT results
+- `data/catalysis_X.csv`, `data/catalysis_y.csv`, `data/catalysis_unit.csv`: the
+  single-atom catalysis primary features, metal/oxide binding energies, and the
+  unit exponents of each feature. They were converted from `data/catalysis.rda`
+  in the R `iBART` package (GPL >= 3) so results are directly comparable. The
+  underlying data originate from the Senftle group's
+  `tsenftle/Metal-Oxide-LASSO-lo` repository, which is **MIT licensed**
+  (Copyright (c) 2018 tsenftle). Numeric DFT results
   are facts and are not subject to copyright.
 - `data/oracle_ibart.json`: a small summary (selected descriptor names, RMSEs,
   and per-iteration sizes) of the reference R-iBART output, extracted from the
