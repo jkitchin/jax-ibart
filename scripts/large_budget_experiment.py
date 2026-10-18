@@ -27,7 +27,7 @@ def has_ratio(expr_str):
 
 def main():
     X, y, names, units = load_metal_support()
-    oracle = json.loads((ROOT / "data" / "oracle_ibart.json").read_text())
+    oracle = json.loads((ROOT / "src" / "jax_ibart" / "data" / "oracle_ibart.json").read_text())
 
     # Large, bartMachine-like budget.
     sel = BartGSESelector(n_perm=50, alpha=0.05, n_tree=50, n_draw=1000, n_burn=1000)

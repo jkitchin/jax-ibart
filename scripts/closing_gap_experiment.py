@@ -5,9 +5,9 @@ from jax_ibart import engineer, sparsify
 from jax_ibart.datasets import load_metal_support
 from jax_ibart.operators import default_binary, default_unary
 from jax_ibart.selection import BartGSESelector
-ROOT = Path("/Users/jkitchin/Dropbox/projects/big-ideas/ibart")
+ROOT = Path(__file__).resolve().parents[1]
 X, y, names, units = load_metal_support()
-oracle = json.loads((ROOT/"data"/"oracle_ibart.json").read_text())
+oracle = json.loads((ROOT/"src"/"jax_ibart"/"data"/"oracle_ibart.json").read_text())
 # PERMISSIVE threshold (alpha=0.25), NO leading screen so the Hfo/Oxv ratio
 # forms from all 59 primaries in round 1. Moderate budget.
 sel = BartGSESelector(n_perm=25, alpha=0.25, n_tree=40, n_draw=400, n_burn=400)

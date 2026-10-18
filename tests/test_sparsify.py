@@ -1,4 +1,4 @@
-"""M3 tests: LASSO screening and l0 best-subset (host-side f64, no bartz)."""
+"""Tests for LASSO screening and l0 best-subset (host-side f64, no bartz)."""
 
 import numpy as np
 

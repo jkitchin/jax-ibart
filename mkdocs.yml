@@ -1,10 +1,15 @@
 site_name: jax-ibart
 site_description: A JAX-native reimplementation of iBART for symbolic descriptor discovery
+site_url: https://jkitchin.github.io/jax-ibart/
 repo_url: https://github.com/jkitchin/jax-ibart
 docs_dir: docs
+hooks:
+  - docs/hooks.py
 
 theme:
   name: material
+  logo: assets/icon.svg
+  favicon: assets/icon.svg
   features:
     - navigation.sections
     - navigation.expand

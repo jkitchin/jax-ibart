@@ -1,10 +1,10 @@
-"""Benchmark harness for jax-ibart (M5).
+"""Benchmark harness for jax-ibart.
 
 Reports feature-engineering throughput and end-to-end backend timings on the
 catalysis dataset. Run:
 
-    PYTHONPATH=src python docs/benchmark.py            # FE + diff backend
-    PYTHONPATH=src python docs/benchmark.py --bart     # also time the bart backend (~minutes)
+    PYTHONPATH=src python scripts/benchmark.py         # FE + diff backend
+    PYTHONPATH=src python scripts/benchmark.py --bart  # also time the bart backend (~minutes)
 
 The feature-engineering engine is vectorized (batched JAX ops over column pairs,
 structural SymPy dedup), so it benefits from GPU when one is available; these CPU

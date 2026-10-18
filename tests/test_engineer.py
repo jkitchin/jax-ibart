@@ -1,6 +1,6 @@
-"""M1 tests: operator algebra and the feature-engineering engine.
+"""Tests for the operator algebra and the feature-engineering engine.
 
-These run without bartz (selection backends are M2). They check numeric
+These run without bartz (the selection backends are tested elsewhere). They check numeric
 correctness, domain protection, symbolic provenance, and that the engineered
 pool can express the target catalysis descriptor dH_ox,fm * O_vac.
 """

@@ -17,6 +17,10 @@ dependencies = [
     "scikit-learn>=1.3",
 ]
 
+[project.urls]
+Homepage = "https://github.com/jkitchin/jax-ibart"
+Documentation = "https://jkitchin.github.io/jax-ibart/"
+
 [project.optional-dependencies]
 # Faithful BART-G.SE selection backend (the correctness oracle path).
 # bartz 0.11 changed the input layout and 0.11-0.13 change the BART-G.SE screen

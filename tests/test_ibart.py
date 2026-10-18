@@ -1,4 +1,4 @@
-"""End-to-end M3 integration: IBart.fit recovers a product descriptor.
+"""End-to-end integration: IBart.fit recovers a product descriptor.
 
 Uses the bart backend (requires bartz); kept small for speed.
 """

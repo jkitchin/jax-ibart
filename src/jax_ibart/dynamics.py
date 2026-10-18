@@ -158,7 +158,9 @@ def discover_ode(
         the library against each derivative before the l0 search, i.e. BART finds
         which terms enter each mole-balance RHS. Needs ``bartz``.
 
-    Returns a :class:`DiscoveredSystem`.
+    Returns
+    -------
+    DiscoveredSystem
     """
     import jax
 

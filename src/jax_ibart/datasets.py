@@ -1,15 +1,13 @@
 """Validation datasets: the public catalysis benchmarks used by iBART.
 
-These are the fixtures for the M4 validation gate (reproduce the published
-descriptor and CV error, cross-check against the R ``iBART`` package).
+The CSV files ship inside the package (``jax_ibart/data``), so the loaders work
+from a plain ``pip install``.
 
 Sources (Senftle group):
 * M-S: 91 binding energies, 13 metals x 7 oxide supports.
        https://github.com/tsenftle/Metal-Oxide-LASSO-lo
-* M-D: 19 metals on doped MgO(100).
-       https://github.com/tsenftle/MgO_SL
 
-Target descriptor to recover on M-S (Liu et al. 2022): dH_ox,fm * O_vac.
+Published descriptor on M-S (Liu et al. 2022): abs(Hfo/Oxv).
 """
 
 from __future__ import annotations
@@ -19,10 +17,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+DATA_DIR = Path(__file__).resolve().parent / "data"
 
 MS_URL = "https://github.com/tsenftle/Metal-Oxide-LASSO-lo"
-MD_URL = "https://github.com/tsenftle/MgO_SL"
 
 
 def load_metal_support():
@@ -38,8 +35,8 @@ def load_metal_support():
       ``IBart.fit(..., units=units)`` to drop unit-inconsistent descriptors.
 
     This is the exact ``catalysis`` dataset shipped with the R ``iBART`` package
-    (converted from ``data/catalysis.rda``), so results are directly comparable.
-    Notable features for the published descriptor (dH_ox,fm * O_vac):
+    (converted from the R package's ``data/catalysis.rda``), so results are directly comparable.
+    Notable features for the published descriptor abs(Hfo/Oxv):
     ``Hfo`` (oxide formation enthalpy) and ``Oxv`` (oxygen vacancy energy); both
     carry unit ``eV``.
     """
@@ -52,11 +49,6 @@ def load_metal_support():
     udf = pd.read_csv(DATA_DIR / "catalysis_unit.csv", index_col=0)
     units = udf[names].to_numpy(dtype=np.int64).T  # -> (n_features, n_dims)
     return X, y, names, units
-
-
-def load_metal_dopant():
-    """Load the M-D (doped MgO) dataset -> (X, y, feature_names)."""
-    raise NotImplementedError("M4+: wire up the MgO_SL loader")
 
 
 def load_reaction():

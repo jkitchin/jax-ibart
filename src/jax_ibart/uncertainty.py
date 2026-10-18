@@ -29,6 +29,8 @@ fresh unfitted estimator, e.g. ``factory=model.clone`` or
 
 from __future__ import annotations
 
+import warnings
+
 from dataclasses import dataclass
 from typing import Callable
 
@@ -49,7 +51,7 @@ def ols_intervals(model, X_train, y_train, X_new=None, alpha: float = 0.10):
     :func:`conformal_intervals` for honest intervals.
     """
     y = np.asarray(y_train, dtype=np.float64)
-    D = model._design(X_train)  # (n, k) selected descriptors
+    D = model.transform(X_train)  # (n, k) selected descriptors
     A = np.column_stack([np.ones(len(y)), D])  # design with intercept
     n, p = A.shape
     beta = model.coef_
@@ -74,7 +76,7 @@ def ols_intervals(model, X_train, y_train, X_new=None, alpha: float = 0.10):
     out = {"coefficients": coefs, "sigma": float(np.sqrt(sigma2)), "dof": dof}
 
     if X_new is not None:
-        Dn = model._design(X_new)
+        Dn = model.transform(X_new)
         An = np.column_stack([np.ones(len(Dn)), Dn])
         pred = An @ beta
         # prediction interval: includes both estimation and noise variance
@@ -130,13 +132,22 @@ def conformal_intervals(
     n_cal = max(int(round(cal_frac * n)), 1)
     cal, tr = idx[:n_cal], idx[n_cal:]
 
-    u_tr = None if units is None else units
-    model = factory().fit(X[tr], y[tr], feature_names, units=u_tr)
+    model = factory().fit(X[tr], y[tr], feature_names, units=units)
     resid = np.abs(y[cal] - np.asarray(model.predict(X[cal])))
 
-    # finite-sample conformal quantile level
-    level = min(np.ceil((n_cal + 1) * (1 - alpha)) / n_cal, 1.0)
-    qhat = float(np.quantile(resid, level, method="higher"))
+    # Finite-sample conformal quantile. If ceil((n_cal + 1)(1 - alpha)) > n_cal
+    # the calibration set is too small for the guarantee and the interval is
+    # unbounded.
+    rank = int(np.ceil((n_cal + 1) * (1 - alpha)))
+    if rank > n_cal:
+        warnings.warn(
+            f"{n_cal} calibration points are too few for alpha={alpha}; "
+            "the conformal interval is infinite",
+            stacklevel=2,
+        )
+        qhat = float("inf")
+    else:
+        qhat = float(np.quantile(resid, rank / n_cal, method="higher"))
     return ConformalModel(model=model, half_width=qhat, alpha=alpha)
 
 
@@ -254,8 +265,8 @@ def bart_posterior_intervals(
     """
     from .selection import bartz_layout, fit_gbart
 
-    D_tr = np.asarray(model._design(X_train), dtype=np.float32)
-    D_new = np.asarray(model._design(X_new), dtype=np.float32)
+    D_tr = np.asarray(model.transform(X_train), dtype=np.float32)
+    D_new = np.asarray(model.transform(X_new), dtype=np.float32)
     y = np.asarray(y_train, dtype=np.float32)
 
     m = fit_gbart(

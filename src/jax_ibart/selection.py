@@ -29,10 +29,20 @@ def bartz_layout(X):
 
     bartz <= 0.10 takes predictors as ``(p, n)``; 0.11 switched to ``(n, p)``.
     """
+    import re
     from importlib.metadata import version
 
-    major, minor = (int(v) for v in version("bartz").split(".")[:2])
+    major, minor = (int(v) for v in re.findall(r"\d+", version("bartz"))[:2])
     return X if (major, minor) >= (0, 11) else X.T
+
+
+def _x64_off():
+    """Context that runs JAX in float32 even if the user enabled x64 globally."""
+    if hasattr(jax, "enable_x64"):
+        return jax.enable_x64(False)
+    from jax.experimental import disable_x64
+
+    return disable_x64()
 
 
 def fit_gbart(X, y, **kwargs):
@@ -42,12 +52,19 @@ def fit_gbart(X, y, **kwargs):
     noise scale does not exist; like R ``BART`` we then fall back to ``sd(y)``,
     which bartz >= 0.13 requires to be passed explicitly.
     """
-    from bartz.BART import gbart
+    try:
+        from bartz.BART import gbart
+    except ImportError as e:
+        raise ImportError(
+            "the bart backend needs bartz: pip install 'jax-ibart[bart]'"
+        ) from e
 
     n, p = X.shape
     if p >= n:
         kwargs.setdefault("sigest", float(np.std(y)))
-    return gbart(bartz_layout(X), y, **kwargs)
+    # bartz's MCMC scan breaks under jax_enable_x64; run it in float32 regardless.
+    with _x64_off():
+        return gbart(bartz_layout(X), y, **kwargs)
 
 
 def _bart_varprop(X32, y32, seed, *, n_tree, n_draw, n_burn):
@@ -99,15 +116,14 @@ class BartGSESelector:
         screening to tolerate false positives but never drop a true building
         block (no false negatives), so a permissive (larger) alpha is correct
         for iBART's interleaved screening. An over-conservative alpha
-        over-prunes and was found (via the R-iBART oracle cross-check) to be the
-        cause of the exact-descriptor gap on catalysis: at alpha=0.25 the
-        pipeline recovers the published canonical descriptor abs(Hfo/Oxv), which
-        alpha=0.05 screened out. Default 0.10; use ~0.2-0.25 for the most
+        over-prunes; on catalysis (the R-iBART oracle cross-check) alpha=0.05
+        screened out the Hfo/Oxv coupling, while alpha=0.25 selects descriptors
+        built on the published abs(Hfo/Oxv). Default 0.10; use ~0.2-0.25 for the most
         faithful reproduction. (Clean, well-separated problems are insensitive
         to alpha; it matters on collinear, high-dimensional screens.)
     n_tree, n_draw, n_burn : int
         BART ensemble size and MCMC schedule (passed through to ``bartz``).
-        Note: a *larger* MCMC budget does not close the catalysis gap; the
+        Note: a *larger* MCMC budget does not narrow the catalysis gap; the
         screening threshold (alpha) does. See docs/oracle-crosscheck.md.
     """
 
@@ -205,8 +221,12 @@ class DiffSelector:
         self.min_keep = min_keep
 
     def select(self, X, y, *, key):
-        import numpy as np
-
+        try:
+            import optax  # noqa: F401
+        except ImportError as e:
+            raise ImportError(
+                "the diff backend needs optax: pip install 'jax-ibart[diff]'"
+            ) from e
         from ._diffscreen import screen_importance
 
         imp = np.asarray(

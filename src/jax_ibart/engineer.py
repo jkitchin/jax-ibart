@@ -2,10 +2,10 @@
 
 Produces an expanded numeric matrix plus matching SymPy provenance, then filters
 invalid / constant / duplicate columns. Binary operators are the O(d^2) blowup
-that makes this the prime JAX/GPU target; here we keep a correct, readable CPU
-first cut (M1) and optimize with vmap/broadcasting in M5.
+that makes this the prime JAX/GPU target, so each operator is evaluated over all
+columns or column pairs in one batched JAX call.
 
-Optional dimensional analysis (M4): when a pool carries unit-exponent vectors,
+Optional dimensional analysis: when a pool carries unit-exponent vectors,
 operators propagate units and additive operators drop unit-mismatched pairs
 (e.g. "volume + speed"), mirroring the R iBART unit filter.
 """
@@ -28,7 +28,7 @@ class Pool:
 
     ``units`` is optional. When present it has shape (d, n_dims): row j is the
     integer unit-exponent vector of column j. When None, dimensional analysis is
-    disabled and the engine behaves exactly as in M1.
+    disabled and no unit filtering is done.
     """
 
     X: jnp.ndarray  # (n, d)

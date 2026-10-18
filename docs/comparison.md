@@ -20,7 +20,7 @@ do explicit SINDy-style ODE discovery.
 | **Nonparametric BART-G.SE screening (PAN)** | Bayesian-tree, monotone-invariant screening robust to the heavy collinearity that iterated operators create; this is *what makes* the iterative growth tractable. |
 | **Dimensional-analysis (unit) filter** | Drops dimensionally invalid descriptors (`volume + speed`). |
 | **Differentiable selection backend** | Hard-concrete L0 gates: selection that gradients flow through. |
-| **Implicit / null-space discovery** | Finds algebraic constraints `g(x)~0` (the DAE foundation; recovers Michaelis-Menten exactly). |
+| **Implicit / null-space discovery** | Finds algebraic constraints `g(x)~0` (the DAE foundation; recovers Michaelis-Menten exactly from noiseless data). |
 | **Selection-stability + BART posterior UQ** | Per-descriptor bootstrap inclusion frequency; Bayesian-tree posterior predictive intervals. |
 | **Validated against reference R-iBART** | Oracle cross-check; Liu 2022 / Ye 2024 (see [References](references.md)). |
 

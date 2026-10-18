@@ -20,17 +20,8 @@ dist/
 .venv/
 uv.lock
 
-# Downloaded dataset fixtures
-data/*.csv
-data/*.json
-# ...but keep the catalysis validation fixture (converted from the R iBART package's
-# catalysis.rda; see data/README.md and NOTICE.md for provenance)
-!data/catalysis_X.csv
-!data/catalysis_y.csv
-!data/catalysis_unit.csv
-!data/oracle_ibart.json
+# Built docs
 site/
-!data/reaction_kinetics.csv
 
 # Build cache and local tooling (not part of the package)
 .cache/

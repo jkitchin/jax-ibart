@@ -105,7 +105,7 @@ class IBart:
         self.pool_ = None
         self._feature_names = None
 
-    def get_params(self) -> dict:
+    def get_params(self, deep: bool = True) -> dict:
         """Constructor kwargs, for cloning a fresh unfitted estimator."""
         return dict(
             backend=self.backend,
@@ -121,6 +121,17 @@ class IBart:
             **self._selector_kwargs,
         )
 
+    def set_params(self, **params) -> "IBart":
+        """Update constructor kwargs (scikit-learn style); returns ``self``."""
+        own = set(self.get_params()) - set(self._selector_kwargs)
+        for k, v in params.items():
+            if k in own:
+                setattr(self, k, v)
+            else:
+                self._selector_kwargs[k] = v
+        self.selector = make_selector(self.backend, **self._selector_kwargs)
+        return self
+
     def clone(self) -> "IBart":
         """A fresh, unfitted copy with the same configuration."""
         return IBart(**self.get_params())
@@ -132,14 +143,17 @@ class IBart:
         matrix. When given, descriptors that are dimensionally inconsistent
         (e.g. summing two different units) are never generated.
         """
-        self._feature_names = list(feature_names)
-        y = np.asarray(y, dtype=np.float64)
+        X, y, feature_names, units = _check_inputs(X, y, feature_names, units)
+        if self.score not in ("bic", "cv"):
+            raise ValueError(f"score must be 'bic' or 'cv', got {self.score!r}")
+        # Built here so changes to ``backend`` after construction take effect.
+        self.selector = make_selector(self.backend, **self._selector_kwargs)
         key = jax.random.PRNGKey(self.seed)
         unary = default_unary() if self.unary_ops is None else list(self.unary_ops)
         binary = default_binary() if self.binary_ops is None else list(self.binary_ops)
         pool = engineer.from_primary(X, feature_names, units=units)
         n = pool.n_descriptors
-        self.history_ = [{"stage": "primary", "generated": n, "kept": n}]
+        history = [{"stage": "primary", "generated": n, "kept": n}]
 
         # Union of everything kept so far (used when carry_selected).
         selected = None
@@ -148,39 +162,48 @@ class IBart:
         if self.screen_primaries and pool.n_descriptors > 1:
             key, sk = jax.random.split(key)
             pool = self._screen(pool, y, sk)
-            self.history_[0]["kept"] = pool.n_descriptors
+            history[0]["kept"] = pool.n_descriptors
             selected = pool
 
         for step in self.schedule:
-            pool = (
+            if step not in ("u", "b"):
+                raise ValueError(f"schedule steps must be 'u' or 'b', got {step!r}")
+            grown = (
                 engineer.apply_unary(pool, unary)
                 if step == "u"
                 else engineer.apply_binary(pool, binary)
             )
-            generated = pool.n_descriptors
+            generated = grown.n_descriptors
             if generated == 0:
+                # Nothing valid to engineer (e.g. one feature, or every value
+                # outside the operators' domains): stop growing, keep the pool.
+                history.append(
+                    {"stage": step, "generated": 0, "kept": pool.n_descriptors}
+                )
                 break
             key, sk = jax.random.split(key)
-            pool = self._screen(pool, y, sk)
+            pool = self._screen(grown, y, sk)
             if self.carry_selected:
                 selected = pool if selected is None else _union(selected, pool)
                 pool = selected
-            self.history_.append(
+            history.append(
                 {"stage": step, "generated": generated, "kept": pool.n_descriptors}
             )
 
         # Final parametric stage: LASSO screen -> l0 best subset (f64 host-side).
-        self.pool_ = pool
         Xpool = np.asarray(pool.X, dtype=np.float64)
         cand = sparsify.lasso_screen(Xpool, y, n_keep=self.n_keep)
         local, coef = sparsify.l0_best_subset(
             Xpool[:, cand], y, max_dim=self.max_dim, score=self.score
         )
+        history.append({"stage": "l0", "generated": len(cand), "kept": len(local)})
+
+        # Set fitted state only once the fit has succeeded.
+        self._feature_names = feature_names
+        self.pool_ = pool
         self.descriptors_ = [pool.exprs[cand[i]] for i in local]
         self.coef_ = coef
-        self.history_.append(
-            {"stage": "l0", "generated": len(cand), "kept": len(self.descriptors_)}
-        )
+        self.history_ = history
         return self
 
     def _screen(self, pool, y, key):
@@ -197,10 +220,22 @@ class IBart:
             units=None if pool.units is None else pool.units[keep],
         )
 
-    def _design(self, X):
-        """Evaluate the selected descriptors on raw primary features X."""
+    def _check_fitted(self):
+        if self.coef_ is None:
+            raise RuntimeError("this IBart is not fitted yet; call fit first")
+
+    def transform(self, X):
+        """Evaluate the selected descriptors on raw primary features ``X``.
+
+        Returns the ``(n, k)`` design matrix the final linear model uses.
+        """
+        self._check_fitted()
         syms = [sp.Symbol(n) for n in self._feature_names]
         X = np.asarray(X, dtype=np.float64)
+        if X.ndim != 2 or X.shape[1] != len(syms):
+            raise ValueError(
+                f"X must have shape (n, {len(syms)}), got {tuple(X.shape)}"
+            )
         cols = []
         for expr in self.descriptors_:
             f = sp.lambdify(syms, expr, modules="numpy")
@@ -209,10 +244,16 @@ class IBart:
             )
         return np.column_stack(cols)
 
+    _design = transform  # backward-compatible alias
+
     def predict(self, X):
-        if self.coef_ is None:
-            raise RuntimeError("call fit before predict")
-        D = self._design(X)
+        """Predict ``y`` for raw primary features ``X``.
+
+        The symbolic descriptors are evaluated as written, so operators such as
+        ``log`` and ``sqrt`` give NaN outside their real domain (the training
+        pipeline evaluates them on ``|x|``).
+        """
+        D = self.transform(X)
         return self.coef_[0] + D @ self.coef_[1:]
 
     def expression(self, digits: int = 4) -> sp.Expr:
@@ -221,6 +262,7 @@ class IBart:
         Coefficients are rounded to ``digits`` significant figures for display
         (pass ``digits=None`` for full precision).
         """
+        self._check_fitted()
         expr = sp.Float(self.coef_[0])
         for c, d in zip(self.coef_[1:], self.descriptors_):
             expr = expr + sp.Float(c) * d
@@ -239,6 +281,33 @@ class IBart:
         if self.coef_ is None:
             return "IBart(unfitted)"
         return f"${self.latex()}$"
+
+
+def _check_inputs(X, y, feature_names, units):
+    """Validate shapes and values before fitting; returns normalized inputs."""
+    X = np.asarray(X, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    if X.ndim != 2:
+        raise ValueError(f"X must be 2-D (n_samples, n_features), got {X.ndim}-D")
+    n, p = X.shape
+    if y.shape != (n,):
+        raise ValueError(f"y must have shape ({n},), got {y.shape}")
+    feature_names = list(feature_names)
+    if len(feature_names) != p:
+        raise ValueError(f"got {len(feature_names)} feature names for {p} columns")
+    if not np.isfinite(X).all():
+        raise ValueError("X contains NaN or inf")
+    if not np.isfinite(y).all():
+        raise ValueError("y contains NaN or inf")
+    if np.ptp(y) == 0:
+        raise ValueError("y is constant")
+    if units is not None:
+        units = np.asarray(units)
+        if units.ndim != 2 or units.shape[0] != p:
+            raise ValueError(
+                f"units must have shape ({p}, n_dims), got {tuple(units.shape)}"
+            )
+    return X, y, feature_names, units
 
 
 def _union(a, b):

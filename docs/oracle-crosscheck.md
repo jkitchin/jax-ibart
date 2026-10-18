@@ -5,11 +5,11 @@ implementation on the identical catalysis dataset.
 
 ## The oracle
 
-A full R `iBART` install needs Java + rJava + bartMachine, which is not set up
-here. Fortunately the R package **ships the authors' own precomputed result**,
+A full R `iBART` install needs Java + rJava + bartMachine. Fortunately the R
+package **ships the authors' own precomputed result**,
 `data/iBART_real_data.rda` (the object the `real_data` vignette loads). That is
 the authoritative reference output, produced by the package authors on this exact
-data. We extracted it to `data/oracle_ibart.json` (no Java needed to read an
+data. We extracted it to `src/jax_ibart/data/oracle_ibart.json` (no Java needed to read an
 `.rda`).
 
 ### What the oracle selected
@@ -25,8 +25,7 @@ The interpretable l0 best-k models (directly comparable to our `max_dim`):
 
 The full LASSO model (18 descriptors) has in-sample RMSE 0.466. The
 **canonical single descriptor is `abs(Hfo/Oxv)`** = |dH_ox,fm / O_vac|, a ratio
-of oxide formation enthalpy to oxygen vacancy energy. (Our earlier prose said
-"Hfo x Oxv"; the published form is the ratio. Both couple the same two drivers.)
+of oxide formation enthalpy to oxygen vacancy energy.
 
 The oracle's per-iteration generated/selected sizes are `gen=[59,333,128,830]`,
 `sel=[12,9,2,18]`.
@@ -55,13 +54,13 @@ right physical drivers and the right *order* of accuracy, but **not** the exact
 
 - **Recovers the right physical drivers** (`Hfo`, and `Oxv` when not over-
   screened).
-- **With a permissive screening threshold it reproduces the exact
-  `abs(Hfo/Oxv)` descriptor** the authors report (see "Closing the gap" below).
+- **With a permissive screening threshold it selects descriptors built on
+  `|Hfo/Oxv|`** (see "Narrowing the gap" below).
 
 This is expected and not alarming: BART-G.SE screening is stochastic and the
 default screening threshold was too conservative (see below).
 
-## Closing the gap: it was the threshold, not the budget
+## Narrowing the gap: it was the threshold, not the budget
 
 We tested the obvious hypothesis first, that a larger MCMC budget would close the
 gap. **It did not.** With a large budget (`n_perm=50, n_tree=50, 1000 draws`) and
@@ -76,29 +75,46 @@ conservative default did (`[8,7,3,3]`). The PAN criterion explicitly says
 intermediate screening should *tolerate false positives and avoid false
 negatives*, i.e. be permissive.
 
-Making the screen permissive (`alpha=0.25`, no leading screen, a modest budget)
-closes the gap:
+Making the screen permissive (`alpha=0.25`, no leading screen, and a modest
+budget `n_perm=25, n_tree=40, n_draw=400, n_burn=400, n_keep=15`) narrows the
+gap:
 
 | k | PORT descriptor(s)                                   | PORT RMSE | ORACLE RMSE |
 |---|------------------------------------------------------|-----------|-------------|
-| 1 | `exp(BVS/Hfo) * abs(Hfo/Oxv)`                         | 1.01      | 0.929 |
-| 3 | ... `sin(pi*Oxv*s_phi)*abs(Hfo/Oxv)`, ...            | 0.82      | 0.624 |
+| 1 | `exp(BVS/Hfo) * abs(Hfo/Oxv)`                         | 1.012     | 0.929 |
+| 2 | `exp(BVS/Hfo) * abs(Hfo/Oxv)`, ...                    | 0.930     | 0.664 |
+| 3 | ... `sin(pi*Oxv*s_phi)*abs(Hfo/Oxv)`, ...            | 0.822     | 0.624 |
 
-The final pool now contains **43 descriptors, 9 of which couple Hfo and Oxv, and
-the exact published descriptor `abs(Hfo/Oxv)` is present** and used in the
-selected models. RMSE drops from ~1.6/1.06 to ~1.0/0.82, approaching the oracle's
-0.93/0.62, and the run takes ~16 s (permissiveness is not a budget cost).
+The selected models are now built on `|Hfo/Oxv|` as a factor, and k=3 RMSE
+improves from 1.06 to 0.82, though it is still above the oracle's at every k.
+The bare ratio `abs(Hfo/Oxv)` is generated in round 1 but does not survive to
+the final pool, because each binary round replaces its inputs; set
+`carry_selected=True` to keep every round's survivors, as R iBART does. The run
+takes about 25 s on a laptop CPU (permissiveness is not a budget cost).
 
 On clean, well-separated problems alpha is irrelevant (even `alpha=0.25` keeps
 only the true drivers with zero false positives); it matters only on collinear,
 high-dimensional screens like this one. We therefore changed the default to
 `alpha=0.10` (more PAN-aligned) and recommend `alpha~0.2-0.25` for the most
-faithful reproduction. **The exact-descriptor gap was a screening-permissiveness
-bug in the default, not a budget or hardware limit.**
+faithful reproduction. **Most of the gap was screening permissiveness in the
+default, not a budget or hardware limit.**
+
+## bartz version
+
+`jax-ibart` pins `bartz>=0.7,<0.11`. bartz 0.11 changed its input layout, and
+0.11-0.13 change the BART-G.SE screen enough that the results on this page no
+longer reproduce. Re-validate against this page before lifting the pin.
 
 ## Reproduce
 
-```bash
-# oracle facts are in data/oracle_ibart.json
-PYTHONPATH=src python -c "import json; print(json.load(open('data/oracle_ibart.json'))['lzero_1'])"
+Run the [catalysis notebook](examples/02_catalysis.ipynb), which compares
+with the oracle's l0 models, or `pytest -m slow`
+(`test_permissive_screen_recovers_hfo_oxv_coupling`). The oracle facts are in
+`src/jax_ibart/data/oracle_ibart.json`:
+
+```python
+import json
+from jax_ibart.datasets import DATA_DIR
+
+print(json.loads((DATA_DIR / "oracle_ibart.json").read_text())["lzero_1"])
 ```

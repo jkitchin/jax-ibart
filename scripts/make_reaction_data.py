@@ -14,7 +14,7 @@ Mole balances (the RHS we want to rediscover):
 
 Several initial conditions (batches) are integrated to cover concentration
 space (needed for identifiability), with small measurement noise added. Writes
-data/reaction_kinetics.csv with columns: batch, t, CA, CB, CC, CD.
+src/jax_ibart/data/reaction_kinetics.csv with columns: batch, t, CA, CB, CC, CD.
 """
 
 from pathlib import Path
@@ -49,7 +49,7 @@ def main(noise=0.02, seed=0):
             rows.append([b, float(ti), *map(float, ci)])
 
     df = pd.DataFrame(rows, columns=["batch", "t", "CA", "CB", "CC", "CD"])
-    out = ROOT / "data" / "reaction_kinetics.csv"
+    out = ROOT / "src" / "jax_ibart" / "data" / "reaction_kinetics.csv"
     df.to_csv(out, index=False)
     print(f"wrote {out}  ({len(df)} rows, {df.batch.nunique()} batches)")
     print(f"true: dCA/dt=-{K1}*CA*CB; dCC/dt={K1}*CA*CB-{K2}*CC; dCD/dt={K2}*CC")

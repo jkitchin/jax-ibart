@@ -10,10 +10,17 @@ feature selection**, keeping the active descriptor pool small at every step
 instead of enumerating the full O(10^17) candidate space.
 
 ```python
+import numpy as np
 from jax_ibart import IBart
 
-model = IBart(backend="bart").fit(X, y, feature_names=names)
-print(model.expression())     # e.g.  -0.099*BVS*Hfo + ...
+rng = np.random.default_rng(0)
+names = ["a", "b", "c", "d", "e", "f"]
+X = rng.uniform(0.5, 2.0, size=(90, 6))
+y = 5.0 * X[:, 0] * X[:, 1] + rng.normal(0, 0.05, 90)  # only a*b matters
+
+model = IBart(backend="diff", schedule=("b",), max_dim=1, seed=0, steps=1200)
+model.fit(X, y, feature_names=names)
+print(model.expression())   # 4.99*a*b + 0.01599
 ```
 
 ## Why it exists
@@ -41,9 +48,10 @@ descriptors (e.g. `volume + speed`).
 
 ## Validation
 
-On the single-atom catalysis dataset the port recovers predictive models built
-on the known physical drivers (oxide formation enthalpy and oxygen vacancy
-energy). See [the catalysis writeup](validation-catalysis.md) and the
+On the single-atom catalysis dataset the port selects models built on the
+published descriptor `|Hfo/Oxv|` (oxide formation enthalpy over oxygen vacancy
+energy), with in-sample RMSE 0.82 eV against the published 0.62 eV for three
+descriptors. See [the catalysis writeup](validation-catalysis.md) and the
 [R-iBART oracle cross-check](oracle-crosscheck.md).
 
 ## Start here
@@ -57,4 +65,5 @@ energy). See [the catalysis writeup](validation-catalysis.md) and the
 
 This is an independent reimplementation. Please cite the original iBART papers
 (Liu et al. 2022, *J. Chem. Phys.* 156:164105; Ye, Senftle & Li 2024, *JASA*
-119:81-94) and `bartz` (Petrillo 2024). See `NOTICE.md`.
+119:81-94) and `bartz` (Petrillo 2024). See
+[`NOTICE.md`](https://github.com/jkitchin/jax-ibart/blob/main/NOTICE.md).

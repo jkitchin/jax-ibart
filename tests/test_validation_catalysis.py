@@ -1,11 +1,11 @@
-"""M4 golden test: reproduce the published catalysis result.
+"""Golden test: reproduce the published catalysis result.
 
 Runs the full faithful pipeline on the exact R-iBART ``catalysis`` dataset with
-the paper's descriptor-generating strategy (opt = binary, unary, binary; K=5;
+the paper's descriptor-generating strategy (opt = binary, unary, binary; max_dim=3;
 standardize=False) and checks that it recovers a predictive model built on the
 known physical drivers Hfo (dH_ox,fm) and Oxv (O_vac).
 
-Slow (~3-4 min): the round-1 binary expansion of 59 features is ~12k
+Slow (minutes): the round-1 binary expansion of 59 features is thousands of
 descriptors, screened by BART-G.SE three times. Opt in with ``pytest -m slow``.
 
 Reference (Liu et al. 2022; Ye, Senftle & Li 2024): the OIS model explains the
@@ -47,7 +47,7 @@ def test_reproduces_catalysis_descriptor():
     # Interpretability / physics: the model must be built on at least one of the
     # known catalysis drivers, the oxide formation enthalpy (Hfo) or the oxygen
     # vacancy energy (Oxv), which the oracle's canonical descriptor abs(Hfo/Oxv)
-    # couples. Exact-descriptor reproduction is budget-limited; see
+    # couples. Exact-descriptor reproduction is not asserted; see
     # docs/oracle-crosscheck.md. We assert the robust invariant: a known driver
     # is selected. (Whether both appear varies with the stochastic screening.)
     used = set()
@@ -59,8 +59,8 @@ def test_reproduces_catalysis_descriptor():
 @pytest.mark.slow
 def test_permissive_screen_recovers_hfo_oxv_coupling():
     """With a permissive (PAN-aligned) screen, the port recovers the published
-    Hfo/Oxv coupling (the canonical descriptor is abs(Hfo/Oxv)). The default
-    alpha=0.05 over-pruned and missed it; see docs/oracle-crosscheck.md.
+    Hfo/Oxv coupling (the canonical descriptor is abs(Hfo/Oxv)). The old
+    default alpha=0.05 over-pruned and missed it; see docs/oracle-crosscheck.md.
     """
     X, y, names, units = load_metal_support()
     model = IBart(

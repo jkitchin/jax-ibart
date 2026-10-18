@@ -1,6 +1,9 @@
+<p align="center"><img src="docs/assets/logo.svg" alt="jax-ibart" width="200"></p>
+
 # jax-ibart
 
 [![CI](https://github.com/jkitchin/jax-ibart/actions/workflows/ci.yml/badge.svg)](https://github.com/jkitchin/jax-ibart/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-jkitchin.github.io%2Fjax--ibart-indigo)](https://jkitchin.github.io/jax-ibart/)
 
 A JAX-native reimplementation of **iBART** (iterative Bayesian Additive
 Regression Trees) for symbolic descriptor discovery in materials informatics.
@@ -15,56 +18,67 @@ References: Liu et al. 2022 (*J. Chem. Phys.* 156:164105); Ye, Senftle & Li 2024
 (*JASA* 119:81-94). Reference implementation: the R package
 [`mattsheng/iBART`](https://github.com/mattsheng/iBART).
 
-## Status
+## Features
 
-All planned milestones (M0-M5) are done, and the package is validated against the
-published iBART results on the catalysis dataset.
+- Operator algebra and a vectorized feature-engineering engine with symbolic
+  (SymPy) provenance for every descriptor.
+- Two selection backends behind one interface: faithful BART-G.SE screening via
+  [`bartz`](https://github.com/Gattocrucco/bartz), the GPU JAX BART, and a
+  differentiable hard-concrete-L0 gated screener (Louizos et al. 2018).
+- LASSO screening plus l0 best-subset final models; `IBart.fit` / `.predict`.
+- A dimensional-analysis (unit) filter that drops descriptors like
+  `volume + speed` (about 70% of the round-1 space on the catalysis data).
+- Validated on the single-atom catalysis dataset against the R iBART authors'
+  own output: the selected models are built on the published `|Hfo/Oxv|`
+  descriptor ([validation](docs/validation-catalysis.md),
+  [oracle cross-check](docs/oracle-crosscheck.md)).
+- Uncertainty quantification: split-conformal intervals, selection stability,
+  repeated-split RMSE, OLS intervals, and the BART posterior.
+- Sparse identification of dynamics (SINDy) and implicit algebraic constraints.
 
-- [x] Package skeleton, `pyproject`, dataset stubs, test harness (M0)
-- [x] Operator algebra + feature-engineering engine + symbolic provenance (M1)
-- [x] BART-G.SE selection via `bartz` -- faithful oracle (M2a)
-- [x] Differentiable selection backend -- hard-concrete L0 gates, ~13x faster (M2b)
-- [x] LASSO + l0 final stage + orchestrator -- `IBart.fit`/`.predict` end-to-end (M3)
-- [x] Validation on the catalysis dataset -- R^2=0.93, recovers the Hfo/Oxv drivers (M4)
-- [x] Dimensional-analysis (unit) filter -- drops ~70% of the space, faster, more physical
-- [x] Vectorized feature engineering + benchmarks -- FE ~5x faster, GPU-ready (M5)
-- [x] R-iBART oracle cross-check -- against the authors' shipped output (docs/oracle-crosscheck.md)
-- [x] Closed the exact-descriptor gap -- recovers `abs(Hfo/Oxv)` via a permissive PAN-aligned screen (not budget/GPU)
-- [x] Uncertainty quantification -- conformal (honest CIs), selection stability, repeated-split RMSE, OLS CIs, BART posterior
+## Install
 
-## Design in one paragraph
-
-JAX traces carry the *numeric* descriptor columns; plain Python + SymPy carry
-each descriptor's *symbolic* expression, kept in lockstep but never mixed inside
-a trace. Selection is pluggable behind one interface with two backends:
-`bart` (faithful BART-G.SE via [`bartz`](https://github.com/Gattocrucco/bartz),
-the GPU JAX BART) and `diff` (a differentiable soft-tree / neural importance
-screener). Both must satisfy the PAN criterion (no false negatives in screening).
-
-## Install (dev)
+Not on PyPI yet; install from GitHub:
 
 ```bash
-uv pip install -e ".[all]"   # bart + diff + dev extras
-pytest                       # M1 tests run without bartz
+pip install "jax-ibart[bart] @ git+https://github.com/jkitchin/jax-ibart"
+```
+
+The default `backend="bart"` needs the `bart` extra (`bartz<0.11`; see
+[installation](docs/installation.md)); `backend="diff"` needs the `diff` extra.
+For development:
+
+```bash
+git clone https://github.com/jkitchin/jax-ibart
+cd jax-ibart
+uv sync --extra all
+uv run pytest            # core tests run without bartz
 ```
 
 ## Quick taste
 
+Find the hidden product `a*b` among six features (the
+[quickstart notebook](docs/examples/01_quickstart.ipynb) walks through it):
+
 ```python
+import numpy as np
 from jax_ibart import IBart
 
-model = IBart(backend="bart").fit(X, y, feature_names=names)
-print(model.expression())   # e.g.  -0.099*BVS*Hfo + ...
+rng = np.random.default_rng(0)
+names = ["a", "b", "c", "d", "e", "f"]
+X = rng.uniform(0.5, 2.0, size=(90, 6))
+y = 5.0 * X[:, 0] * X[:, 1] + rng.normal(0, 0.05, 90)  # only a*b matters
+
+model = IBart(backend="diff", schedule=("b",), max_dim=1, seed=0, steps=1200)
+model.fit(X, y, feature_names=names)
+print(model.expression())   # 4.99*a*b + 0.01599
 ```
 
 ## Documentation
 
-A full docs site (mkdocs-material + API reference + runnable example notebooks):
-
-```bash
-uv pip install -e ".[docs]"
-mkdocs serve        # http://127.0.0.1:8000
-```
+Full documentation, with the API reference and executed example notebooks, is
+at <https://jkitchin.github.io/jax-ibart/>. To build it locally:
+`uv sync --extra docs && uv run mkdocs serve`.
 
 - Worked notebooks under [`docs/examples/`](docs/examples/), with rendered
   outputs:
@@ -85,47 +99,16 @@ mkdocs serve        # http://127.0.0.1:8000
 - Validation: [`docs/validation-catalysis.md`](docs/validation-catalysis.md),
   the [R-iBART oracle cross-check](docs/oracle-crosscheck.md), and
   [benchmarks](docs/benchmark.md).
-- Rebuild the example notebooks: `python scripts/build_notebooks.py` then
+- Rebuild the example notebooks: `uv run --extra all --with nbformat python scripts/build_notebooks.py` then
   `uv run --extra all --with nbconvert --with ipykernel jupyter nbconvert --to notebook --execute --inplace docs/examples/*.ipynb`.
   The docs show the committed outputs (notebooks are not executed at build time).
 
 ## Comparison to [jaxsr](https://github.com/jkitchin/jaxsr)
 
-[`jaxsr`](https://github.com/jkitchin/jaxsr) ("a symbolic regression engine for
-JAX") is a **broad, mature general-purpose** SR toolkit; `jax-ibart` is a
-**faithful, specialized** implementation of one method (iBART/OIS). They overlap
-(both JAX/GPU, LASSO sparse selection, conformal + bootstrap UQ, OLS intervals,
-BIC, SymPy export, parity plots, sklearn-ish, and both can do explicit SINDy-ODE)
-but their distinctive strengths differ.
-
-**Only `jax-ibart`:**
-
-| Capability | Why it matters |
-|---|---|
-| **Iterative operator-composition library** | *Grows* the library by composing operators and pruning between rounds, reaching deep descriptors like `(exp(x1)-exp(x2))^2` without enumerating the O(10^17) space. `jaxsr` uses a fixed, user-specified basis. |
-| **Nonparametric BART-G.SE screening (PAN)** | Bayesian-tree, monotone-invariant screening robust to the heavy collinearity iterated operators create; this is *what makes* the iterative growth tractable. |
-| **Dimensional-analysis (unit) filter** | Drops dimensionally invalid descriptors (`volume + speed`). |
-| **Differentiable selection backend** | Hard-concrete L0 gates: selection that gradients flow through. |
-| **Implicit / null-space discovery** | Finds algebraic constraints `g(x)~0` (DAE foundation; recovers Michaelis-Menten exactly). |
-| **Selection-stability + BART posterior UQ** | Per-descriptor bootstrap inclusion frequency; Bayesian tree posterior intervals. |
-| **Validated against reference R-iBART** | Oracle cross-check; Liu 2022 / Ye 2024 (see [References](docs/references.md)). |
-
-**Only `jaxsr`:**
-
-| Capability | Notes |
-|---|---|
-| **Symbolic classification** | binary/multiclass. `jax-ibart` is regression-only. |
-| **Physical constraints** | monotonicity, convexity/concavity, bounds, sign, linear. `jax-ibart` has none (only the unit filter). |
-| **Bayesian Model Averaging / Pareto ensembles** | average over models; complexity-accuracy front. `jax-ibart` selects one sparse model. |
-| **Adaptive sampling / DOE** | uncertainty/leverage/gradient acquisition. |
-| **Broader UQ + criteria** | jackknife+ conformal, mean-response bands, AIC/AICc. |
-| **Tooling & maturity** | LaTeX export, JSON persistence, full sklearn (`set_params`/`GridSearchCV`/`Pipeline`), CLI, and a rich visualization suite. |
-
-**One-liner:** reach for `jaxsr` as a flexible, full-featured general SR toolkit
-(constraints, BMA, DOE, classification, visualization); reach for `jax-ibart`
-when you specifically want the iBART method, adaptive library *growth* for hard
-high-order nonlinear descriptors, BART-based screening, dimensional-analysis-aware
-discovery, a differentiable backend, or the implicit-constraint / DAE direction.
+`jaxsr` is a broad, general-purpose symbolic regression toolkit with a fixed,
+user-specified basis; `jax-ibart` is a specialized implementation of iBART that
+*grows* its descriptor library by composing operators and pruning between
+rounds. See [the comparison](docs/comparison.md) for when to use which.
 
 ## Dynamical systems (SINDy / DAEs)
 
@@ -154,4 +137,4 @@ iBART method; it copies no code from the GPL R `iBART` package and depends only
 on permissively licensed libraries (MIT `bartz`, Apache `jax`/`optax`, BSD
 `sympy`/`scikit-learn`). Please cite the original iBART papers and `bartz`; see
 [`NOTICE.md`](NOTICE.md). Bundled data provenance is in
-[`data/README.md`](data/README.md).
+[`src/jax_ibart/data/README.md`](src/jax_ibart/data/README.md).

@@ -85,8 +85,12 @@ def l0_best_subset(X, y, max_dim: int = 3, score: str = "bic"):
     ``X`` and ``coef`` is the OLS coefficient vector ``[intercept, *slopes]``
     for that subset (f64).
     """
+    if score not in ("bic", "cv"):
+        raise ValueError(f"score must be 'bic' or 'cv', got {score!r}")
     X, y = _as_f64(X, y)
     n, d = X.shape
+    if d == 0:
+        raise ValueError("no candidate descriptors to choose from")
     max_dim = min(max_dim, d)
 
     def score_subset(cols):

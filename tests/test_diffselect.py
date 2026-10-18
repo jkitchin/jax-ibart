@@ -1,4 +1,4 @@
-"""M2b tests: the differentiable (diff) selection backend.
+"""Tests for the differentiable (diff) selection backend.
 
 Fast (no bartz): the gated MLP trains in ~1 s. Acceptance:
 1. keeps the true drivers and rejects noise (PAN: no false negatives);

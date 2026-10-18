@@ -1,4 +1,4 @@
-"""M2a tests: the faithful BART-G.SE selection backend (requires bartz).
+"""Tests for the faithful BART-G.SE selection backend (requires bartz).
 
 PAN acceptance: on a problem where only x0, x1 drive y, the selector must keep
 both (no false negatives) and reject pure-noise features.

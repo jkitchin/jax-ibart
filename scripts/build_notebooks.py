@@ -158,7 +158,7 @@ pred = model.predict(X)
 resid = y - pred
 r2 = 1 - (resid ** 2).sum() / ((y - y.mean()) ** 2).sum()
 rmse = np.sqrt((resid ** 2).mean())
-D = model._design(X)[:, 0]   # the descriptor evaluated on the data
+D = model.transform(X)[:, 0]   # the descriptor evaluated on the data
 
 fig, axes = plt.subplots(1, 2, figsize=(9, 4))
 axes[0].scatter(D, y, s=12, alpha=0.7)
@@ -248,7 +248,9 @@ The best single primary feature has |r| of about 0.74 with the binding energy.
 The answer has to be a combination.
 """),
     code("""
-r = np.array([np.corrcoef(X[:, j], y)[0, 1] for j in range(X.shape[1])])
+with np.errstate(invalid="ignore"):  # a few primaries are constant -> r undefined
+    r = np.array([np.corrcoef(X[:, j], y)[0, 1] for j in range(X.shape[1])])
+r = np.nan_to_num(r)
 order = np.argsort(-np.abs(r))
 print("top primaries by |r|:", [(names[j], round(abs(r[j]), 3)) for j in order[:5]])
 
@@ -327,9 +329,10 @@ trade-off, which we compare with the published l0 models.
 """),
     code("""
 import json
-from pathlib import Path
 
-oracle = json.loads(Path("../../data/oracle_ibart.json").read_text())
+from jax_ibart.datasets import DATA_DIR
+
+oracle = json.loads((DATA_DIR / "oracle_ibart.json").read_text())
 published = oracle["lzero_in_sample_rmse"][:3]
 
 P = np.asarray(model.pool_.X, dtype=np.float64)
@@ -416,7 +419,7 @@ for d_ in fast.descriptors_:
   metal/oxide binding energies, 59 features) shipped with the R `iBART`
   package; the underlying DFT data are from the Senftle group's MIT-licensed
   [`Metal-Oxide-LASSO-lo`](https://github.com/tsenftle/Metal-Oxide-LASSO-lo)
-  repository. See [`data/README.md`](https://github.com/jkitchin/jax-ibart/blob/main/data/README.md).
+  repository. See [`data/README.md`](https://github.com/jkitchin/jax-ibart/blob/main/src/jax_ibart/data/README.md).
 - **Reference result** (`oracle_ibart.json`): the published iBART l0 descriptors
   and RMSEs, from the papers below.
 - **Method**: C.-Y. Liu, S. Ye, M. Li, T. P. Senftle, *J. Chem. Phys.* **156**,

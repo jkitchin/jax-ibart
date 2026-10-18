@@ -1,18 +1,31 @@
-# M4 validation: single-atom catalysis (metal-support binding energy)
+# Validation: single-atom catalysis (metal-support binding energy)
 
-Result of running the faithful `jax-ibart` pipeline on the exact `catalysis`
-dataset shipped with the R `iBART` package (`data/catalysis.rda`, converted to
-`data/catalysis_X.csv` / `data/catalysis_y.csv`). This is the dataset and task
-from Liu et al. 2022 (*J. Chem. Phys.* 156:164105) and Ye, Senftle & Li 2024
-(*JASA* 119:81-94).
+Result of running `jax-ibart` on the exact `catalysis` dataset shipped with the
+R `iBART` package (`data/catalysis.rda`, converted to
+`src/jax_ibart/data/catalysis_X.csv` / `catalysis_y.csv`). This is the dataset
+and task from Liu et al. 2022 (*J. Chem. Phys.* 156:164105) and Ye, Senftle & Li
+2024 (*JASA* 119:81-94). The full, executed analysis is the
+[catalysis notebook](examples/02_catalysis.ipynb).
 
 ## Setup
 
 - Data: n = 91 metal/oxide binding energies, p = 59 primary features.
-- Strategy: `opt = (binary, unary, binary)` (the paper's eq. 8 schedule),
-  K = 3 (l0 best subset, BIC), `standardize = False`.
-- Backend: faithful BART-G.SE via `bartz`. Modest MCMC budget for a single run:
-  `n_perm=10, n_tree=30, n_draw=200, n_burn=200`, `seed=0`.
+- Strategy: `schedule = ("b", "u", "b")` (the paper's eq. 8 schedule),
+  `max_dim = 3` (l0 best subset, BIC), unit filter on.
+- Backend: BART-G.SE via `bartz`, with the permissive screen recommended in the
+  [oracle cross-check](oracle-crosscheck.md):
+
+```python
+from jax_ibart import IBart
+from jax_ibart.datasets import load_metal_support
+
+X, y, names, units = load_metal_support()
+model = IBart(backend="bart", alpha=0.25, n_perm=25, n_tree=40, n_draw=400,
+              n_burn=400, n_keep=15, max_dim=3, seed=0)
+model.fit(X, y, names, units=units)
+```
+
+The fit takes about 20-30 s on a laptop CPU.
 
 ## The dimensional-analysis (unit) filter
 
@@ -21,71 +34,53 @@ The R iBART package eliminates dimensionally invalid descriptors (e.g.
 carries an integer unit-exponent vector (12 base dimensions for this dataset);
 additive operators only combine matching units, multiply/divide add/subtract
 exponents, and root/transcendental unary operators return unitless results
-(matching `R/operations.R`). Enabled via `IBart.fit(..., units=units)`.
+(matching `R/operations.R`). Enable it with `IBart.fit(..., units=units)`.
 
-Effect on this run (seed=0, same settings; units-ON carries the filter through
-*every* FE round, a correctness fix found during the oracle cross-check):
+On this dataset the filter cuts the round-1 binary space from 11,370 to 3,570
+descriptors (about 70%), and it is applied in every engineering round. See the
+[custom operators and units notebook](examples/04_custom_operators_units.ipynb).
 
-| Metric                     | Units OFF | Units ON |
-|----------------------------|-----------|----------|
-| Round-1 binary descriptors | ~12,000   | 3,570    |
-| Fit time (CPU)             | 216 s     | 132 s    |
-| In-sample R^2              | 0.921     | 0.856    |
-| Known driver (Hfo/Oxv)     | yes       | yes (Hfo)|
+## Result
 
-The filter removes ~70% of the round-1 space and runs faster. In-sample R^2 is
-slightly lower with units on (the dimensional constraint shrinks the descriptor
-space, trading a little in-sample fit for guaranteed physical interpretability).
-
-## Result (units ON)
-
-In-sample **R^2 = 0.856**. Selected 3-descriptor model:
+In-sample **RMSE = 0.822 eV, R^2 = 0.919**. Selected 3-descriptor model:
 
 ```
-y_hat = +(intercept)
-        - 4.135  * sqrt(m_Chi_MB/m_N_val) * log(s_ion_3/m_n13)
-        + 0.0390 * Hfo * m_ion_1 * s_LUMO / s_Chi_MB_un
-        + 0.1549 * s_HOMO * s_ion_4 / (BVB * s_Chi_P)
+y_hat = -0.3507
+        - 0.002754 * BVB**2*Hfo**2/log(Hs*m_Chi_MB)
+        - 0.4844   * exp(BVS/Hfo)*Abs(Hfo/Oxv)
+        - 0.3449   * sin(pi*Oxv*s_phi)*Abs(Hfo/Oxv)
 ```
 
-## Physics check (the credibility gate)
+Two of the three descriptors contain the published `|Hfo/Oxv|` as a factor.
+Compared with the published l0 models of the same size:
 
-The model is built on a known driver: **`Hfo`** (oxide formation enthalpy,
-dH_ox,fm) appears in `Hfo * m_ion_1 * s_LUMO / s_Chi_MB_un`. Hfo and `Oxv`
-(oxygen vacancy energy) are the metal-oxygen charge-transfer quantities the
-original papers identify as governing metal-support binding (the published
-descriptor is `abs(Hfo/Oxv)`). Which specific drivers and descriptors appear
-varies with the stochastic BART screening and the MCMC budget; see
-[`oracle-crosscheck.md`](oracle-crosscheck.md) for the direct comparison against
-the reference R-iBART output and an honest account of the remaining gap.
+| k | jax-ibart RMSE (eV) | published RMSE (eV) |
+|---|---------------------|---------------------|
+| 1 | 1.012 | 0.929 |
+| 2 | 0.930 | 0.664 |
+| 3 | 0.822 | 0.624 |
+
+The port finds the same physical drivers (`Hfo`, oxide formation enthalpy, and
+`Oxv`, oxygen vacancy energy, coupled through their ratio) but is less accurate
+than the published models at every size. The bare ratio `abs(Hfo/Oxv)` is
+generated during the run but is not in the final pool by default; set
+`carry_selected=True` to keep every round's survivors, as R iBART does. Which
+descriptors appear varies with the stochastic BART screen and the seed.
 
 ## Differentiable backend (`backend="diff"`)
 
-The same pipeline with the differentiable hard-concrete-L0 screener instead of
-BART-G.SE, on the identical data/schedule (seed=0, `steps=1000, l0=0.03`):
+The same schedule with the hard-concrete-L0 screener instead of BART-G.SE
+(`steps=1000, l0=0.03`, `n_keep=10`) runs in about 5 s, roughly 5x faster than
+the bart run above, with in-sample RMSE 1.090 eV. It also finds
+`Oxv`-normalized descriptors (`Abs(Hf/Oxv)`), but its selection is noisier
+than BART's permutation-null screen on this collinear problem (n = 91,
+thousands of candidates). It is validated against the bart backend on synthetic
+fixtures (`tests/test_diffselect.py`); use bart when fidelity matters. See the
+[backends notebook](examples/03_backends.ipynb).
 
-| Metric            | bart (faithful) | diff (differentiable) |
-|-------------------|-----------------|-----------------------|
-| Fit time (CPU)    | 132 s           | **10 s** (~13x faster)|
-| In-sample R^2     | 0.926           | 0.833                 |
-| Oxv selected      | yes             | yes                   |
-| Hfo selected      | yes             | no (picks `Hf`)       |
+## Reproduce
 
-The differentiable backend is dramatically faster but lower fidelity on this
-hard, high-dimensional screen (~12k descriptors, n = 91): the gated MLP is
-heavily overparameterized, so its selection is noisier than BART's permutation-
-null screening. It is validated against the bart oracle on synthetic fixtures
-(`tests/test_diffselect.py`) and is the research/speed path; the bart backend
-remains the faithful path. Tuning (stronger regularization, more steps, a
-permutation-style threshold for the gates) is future work.
-
-## Notes / caveats
-
-- The exact symbolic form differs from the published descriptor (expected: BART
-  screening is stochastic, and the MCMC budget here is deliberately small). The
-  *invariants* that matter, predictive accuracy (~0.92) and selection of the
-  Hfo and Oxv drivers, are reproduced.
-- A larger MCMC budget would be expected to tighten agreement with the exact
-  published expression. A direct R-iBART oracle cross-check on identical inputs
-  remains a follow-up.
-- Reproduce with: `pytest -m slow` (see `tests/test_validation_catalysis.py`).
+Run the [catalysis notebook](examples/02_catalysis.ipynb), or the slow tests
+(`pytest -m slow`): one checks that a small-budget fit reaches R^2 > 0.80 on
+the known drivers, the other that the permissive screen above selects a
+descriptor coupling `Hfo` and `Oxv`.

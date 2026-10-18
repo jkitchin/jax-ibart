@@ -1,4 +1,4 @@
-# M5: vectorization and benchmarks
+# Vectorization and benchmarks
 
 Goal: make the engine fast and GPU-ready, then measure honestly where the time
 goes. Numbers below are single-core CPU (macOS/arm64, JAX CPU backend) on the
@@ -40,20 +40,23 @@ engineering, ~3% everything else. Vectorizing FE gives a real but modest
 end-to-end win there, because the cost is the 33 `bartz` MCMC fits (11 per round
 x 3 rounds: one observed + 10 permutation-null), not the array plumbing.
 
+The numbers above were measured before the unit filter existed; with
+`units=units` (as `scripts/benchmark.py` now runs) every round is smaller and
+faster, so treat the table as historical.
+
 The remaining large levers are therefore in the *selection* step, and they are
 hardware/parallelism, not algorithm:
 
 - **Run `bartz` on a real GPU.** `bartz` is already JAX and reports up to ~200x
-  over a single CPU core on GPU. This machine is CPU-only (macOS/arm64), so that
-  speedup is unrealized here but available on GPU hardware with no code change.
+  over a single CPU core on GPU. The numbers above are CPU-only; that speedup
+  is available on GPU hardware with no code change.
 - **Parallelize the permutation null across devices.** The 10 permutation refits
-  per round are independent and map cleanly onto `pmap` / multiple devices. On a
-  single CPU device there is nothing to overlap, so it is a no-op here but a
-  direct multi-GPU win.
+  per round are independent and map cleanly onto `pmap` / multiple devices; on a
+  single CPU device there is nothing to overlap.
 
 The `diff` backend, which is FE-bound rather than MCMC-bound, benefits most from
-the vectorization (2x) and is ~25x faster than `bart` end-to-end -- the
-speed/fidelity trade documented in `validation-catalysis.md`.
+the vectorization (2x) and is much faster than `bart` end-to-end -- the
+speed/fidelity trade documented in [validation](validation-catalysis.md).
 
 ## Reproduce
 
