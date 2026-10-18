@@ -19,7 +19,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/jkitchin/jax-ibart"
-Documentation = "https://jkitchin.github.io/jax-ibart/"
+Documentation = "https://kitchingroup.cheme.cmu.edu/jax-ibart/"
 
 [project.optional-dependencies]
 # Faithful BART-G.SE selection backend (the correctness oracle path).

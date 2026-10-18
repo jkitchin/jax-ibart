@@ -3,7 +3,7 @@
 # jax-ibart
 
 [![CI](https://github.com/jkitchin/jax-ibart/actions/workflows/ci.yml/badge.svg)](https://github.com/jkitchin/jax-ibart/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/badge/docs-jkitchin.github.io%2Fjax--ibart-indigo)](https://jkitchin.github.io/jax-ibart/)
+[![Docs](https://img.shields.io/badge/docs-kitchingroup.cheme.cmu.edu%2Fjax--ibart-indigo)](https://kitchingroup.cheme.cmu.edu/jax-ibart/)
 
 A JAX-native reimplementation of **iBART** (iterative Bayesian Additive
 Regression Trees) for symbolic descriptor discovery in materials informatics.
@@ -77,7 +77,7 @@ print(model.expression())   # 4.99*a*b + 0.01599
 ## Documentation
 
 Full documentation, with the API reference and executed example notebooks, is
-at <https://jkitchin.github.io/jax-ibart/>. To build it locally:
+at <https://kitchingroup.cheme.cmu.edu/jax-ibart/>. To build it locally:
 `uv sync --extra docs && uv run mkdocs serve`.
 
 - Worked notebooks under [`docs/examples/`](docs/examples/), with rendered
