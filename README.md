@@ -42,14 +42,19 @@ References: Liu et al. 2022 (*J. Chem. Phys.* 156:164105); Ye, Senftle & Li 2024
 
 ## Install
 
-Not on PyPI yet; install from GitHub:
+jax-ibart is not on PyPI; install it from GitHub (Python 3.10-3.13):
 
 ```bash
+# latest release
+pip install "jax-ibart[bart] @ git+https://github.com/jkitchin/jax-ibart@v0.1.0"
+# or the current main branch
 pip install "jax-ibart[bart] @ git+https://github.com/jkitchin/jax-ibart"
 ```
 
-The default `backend="bart"` needs the `bart` extra (`bartz<0.11`; see
-[installation](docs/installation.md)); `backend="diff"` needs the `diff` extra.
+Extras: `bart` for the default `backend="bart"` (`bartz<0.11`; see
+[installation](docs/installation.md)), `diff` for `backend="diff"`, and
+`discopt` for `model.to_discopt(...)` (Python >= 3.12). Combine them as
+`jax-ibart[bart,diff,discopt] @ git+...`.
 For development:
 
 ```bash

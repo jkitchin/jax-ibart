@@ -1,12 +1,13 @@
 # Installation
 
 `jax-ibart` is pure Python and needs no JVM; it is tested on Python 3.10-3.13.
-It is not on PyPI yet; install it from GitHub:
+It is not on PyPI; install it from GitHub:
 
 ```bash
-pip install "jax-ibart[bart] @ git+https://github.com/jkitchin/jax-ibart"   # recommended
-pip install "jax-ibart[diff] @ git+https://github.com/jkitchin/jax-ibart"   # differentiable backend only
-pip install "jax-ibart[bart,diff] @ git+https://github.com/jkitchin/jax-ibart"
+pip install "jax-ibart[bart] @ git+https://github.com/jkitchin/jax-ibart@v0.1.0"   # latest release (recommended)
+pip install "jax-ibart[bart] @ git+https://github.com/jkitchin/jax-ibart"          # current main branch
+pip install "jax-ibart[diff] @ git+https://github.com/jkitchin/jax-ibart@v0.1.0"   # differentiable backend only
+pip install "jax-ibart[bart,diff,discopt] @ git+https://github.com/jkitchin/jax-ibart@v0.1.0"  # everything (Python >= 3.12 for discopt)
 ```
 
 The default `IBart(backend="bart")` needs the `bart` extra; `backend="diff"`
