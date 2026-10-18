@@ -30,8 +30,16 @@ bart = ["bartz>=0.7,<0.11"]
 # Differentiable end-to-end selection backend (hard-concrete L0 gates).
 diff = ["optax>=0.2"]
 dev = ["pytest>=8.0", "matplotlib>=3.8"]
+# Embed fitted models in discopt optimization problems (jax_ibart.export).
+discopt = ["discopt>=0.9; python_version >= '3.12'"]
 docs = ["mkdocs-material>=9.5", "mkdocstrings[python]>=0.24", "mkdocs-jupyter>=0.24"]
-all = ["bartz>=0.7,<0.11", "optax>=0.2", "pytest>=8.0", "matplotlib>=3.8"]
+all = [
+    "bartz>=0.7,<0.11",
+    "optax>=0.2",
+    "discopt>=0.9; python_version >= '3.12'",
+    "pytest>=8.0",
+    "matplotlib>=3.8",
+]
 
 [build-system]
 requires = ["hatchling"]

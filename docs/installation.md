@@ -28,9 +28,10 @@ uv run pytest                     # fast suite (slow validation: pytest -m slow)
 |--------|------|------------|
 | `bart` | `bartz>=0.7,<0.11` | the faithful `IBart(backend="bart")` selection path |
 | `diff` | `optax` | the differentiable `IBart(backend="diff")` path |
+| `discopt` | `discopt` (Python >= 3.12) | `model.to_discopt(...)`: optimizing over a fitted model |
 | `dev`  | `pytest`, `matplotlib` | running the tests and notebooks |
 | `docs` | mkdocs-material, mkdocstrings, mkdocs-jupyter | building this site |
-| `all`  | `bart` + `diff` + `dev` | development |
+| `all`  | `bart` + `diff` + `discopt` + `dev` | development |
 
 ### bartz version
 

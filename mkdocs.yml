@@ -64,6 +64,7 @@ nav:
       - Reaction kinetics (BART): examples/06_reaction_kinetics.ipynb
       - What iBART can/can't find: examples/07_nonlinear.ipynb
       - Uncertainty quantification: examples/08_uncertainty.ipynb
+      - Optimizing over a model: examples/09_optimization.ipynb
   - Validation:
       - Catalysis result: validation-catalysis.md
       - R-iBART oracle cross-check: oracle-crosscheck.md

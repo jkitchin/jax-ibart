@@ -17,7 +17,7 @@ import sympy as sp
 
 from . import engineer, sparsify
 from .operators import default_binary, default_unary
-from .selection import make_selector
+from .selection import _x64_off, make_selector
 
 # Default schedule: tokens "u" (apply unary) / "b" (apply binary); a selection
 # pass runs after each engineering step.
@@ -148,6 +148,10 @@ class IBart:
         ``units`` (optional): an (n_features, n_dims) integer unit-exponent
         matrix. When given, descriptors that are dimensionally inconsistent
         (e.g. summing two different units) are never generated.
+
+        The fit always runs JAX in float32, even if 64-bit mode is enabled
+        globally (some libraries, e.g. discopt, enable it on import), so results
+        do not depend on what else is imported. The final regression is float64.
         """
         if feature_names is None:
             cols = getattr(X, "columns", None)
@@ -158,6 +162,10 @@ class IBart:
                 else [f"x{i}" for i in range(p)]
             )
         X, y, feature_names, units = _check_inputs(X, y, feature_names, units)
+        with _x64_off():
+            return self._fit(X, y, feature_names, units)
+
+    def _fit(self, X, y, feature_names, units):
         if self.score not in ("bic", "cv"):
             raise ValueError(f"score must be 'bic' or 'cv', got {self.score!r}")
         # Built here so changes to ``backend`` after construction take effect.
@@ -214,6 +222,7 @@ class IBart:
 
         # Set fitted state only once the fit has succeeded.
         self._feature_names = feature_names
+        self._X_train = X
         self.pool_ = pool
         self.descriptors_ = [pool.exprs[cand[i]] for i in local]
         self.coef_ = coef
@@ -313,6 +322,17 @@ class IBart:
         for c, d in zip(self.coef_[1:], self.descriptors_):
             expr = expr + sp.Float(c) * d
         return sp.N(expr, digits) if digits else expr
+
+    def to_discopt(self, m, x=None, **kwargs):
+        """Add this model to a discopt optimization model.
+
+        Returns ``(x, y)``: the input variables by feature name and a variable
+        constrained to equal the prediction. Keyword arguments are passed on;
+        see :func:`jax_ibart.export.to_discopt`.
+        """
+        from .export import to_discopt
+
+        return to_discopt(self, m, x, **kwargs)
 
     def latex(self, lhs: str = "y", digits: int = 4) -> str:
         """The fitted model as a LaTeX string, e.g. ``y = -0.099 BVS Hfo + ...``."""

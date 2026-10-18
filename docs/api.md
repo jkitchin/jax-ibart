@@ -56,6 +56,10 @@ Auto-generated from the source docstrings.
 
 ::: jax_ibart.uncertainty.bart_posterior_intervals
 
+## Optimization (discopt export)
+
+::: jax_ibart.export.to_discopt
+
 ## Datasets
 
 ::: jax_ibart.datasets.load_metal_support

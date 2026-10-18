@@ -35,6 +35,10 @@ References: Liu et al. 2022 (*J. Chem. Phys.* 156:164105); Ye, Senftle & Li 2024
 - Uncertainty quantification: split-conformal intervals, selection stability,
   repeated-split RMSE, OLS intervals, and the BART posterior.
 - Sparse identification of dynamics (SINDy) and implicit algebraic constraints.
+- Embed a fitted model in a [discopt](https://github.com/jkitchin/discopt)
+  optimization problem (`model.to_discopt(m)`) and optimize over it globally,
+  with domain guards against poles and undefined logs
+  ([example](docs/examples/09_optimization.ipynb)).
 
 ## Install
 

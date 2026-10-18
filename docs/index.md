@@ -46,6 +46,11 @@ inside a trace. Selection is pluggable behind one interface with two backends:
 An optional **dimensional-analysis filter** drops physically meaningless
 descriptors (e.g. `volume + speed`).
 
+A fitted model is a closed-form formula, so it can be **embedded in an
+optimization problem** and optimized over globally with
+[discopt](https://github.com/jkitchin/discopt) (`model.to_discopt(m)`); see the
+[optimization example](examples/09_optimization.ipynb).
+
 ## Validation
 
 On the single-atom catalysis dataset the port selects models built on the
